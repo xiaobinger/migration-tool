@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
@@ -64,12 +65,10 @@ public class FlowEngine {
         return migrationTaskRepository.save(task);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public void execute(MigrationTask task, String restartFromNodeId) {
         executeFlow(task.getId(), task.getFlowDefinitionId(), restartFromNodeId);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public MigrationTask executeFlow(Long taskId, Long flowDefinitionId, String restartFromNodeId) {
         MigrationTask task = migrationTaskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("任务不存在: " + taskId));
