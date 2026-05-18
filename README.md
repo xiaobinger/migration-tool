@@ -433,7 +433,6 @@ DataSourceConfig (独立)
 | current_node_id | VARCHAR(255) | 当前执行节点 |
 | total_nodes | INT | 总节点数 |
 | completed_nodes | INT | 已完成节点数 |
-| total_records | BIGINT | 总记录数 |
 | success_records | BIGINT | 成功记录数 |
 | failed_records | BIGINT | 失败记录数 |
 | extracted_records | BIGINT | 提取记录数 |
@@ -566,7 +565,7 @@ DataSourceConfig (独立)
 
 | type | 说明 | 关键字段 |
 |------|------|----------|
-| `progress` | 整体进度 | progress, totalRecords, successRecords, failedRecords |
+| `progress` | 整体进度 | progress, successRecords, failedRecords |
 | `node_start` | 节点开始执行 | nodeId, nodeName, nodeStatus |
 | `node_complete` | 节点执行完成 | nodeId, nodeName, nodeStatus |
 | `node_error` | 节点执行失败 | nodeId, nodeName, error |

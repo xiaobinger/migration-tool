@@ -95,25 +95,19 @@
             </el-col>
           </el-row>
           <el-row :gutter="16" style="margin-top: 12px">
-            <el-col :span="6">
-              <div class="stat-item">
-                <div class="stat-value">{{ taskStore.currentTask.totalRecords ?? 0 }}</div>
-                <div class="stat-label">总记录数</div>
-              </div>
-            </el-col>
-            <el-col :span="6">
+            <el-col :span="8">
               <div class="stat-item">
                 <div class="stat-value">{{ taskStore.currentTask.successRecords ?? 0 }}</div>
                 <div class="stat-label">总成功</div>
               </div>
             </el-col>
-            <el-col :span="6">
+            <el-col :span="8">
               <div class="stat-item">
                 <div class="stat-value">{{ taskStore.currentTask.failedRecords ?? 0 }}</div>
                 <div class="stat-label">总失败</div>
               </div>
             </el-col>
-            <el-col :span="6">
+            <el-col :span="8">
               <div class="stat-item">
                 <div class="stat-value">{{ taskStore.currentTask.completedNodes }}/{{ taskStore.currentTask.totalNodes }}</div>
                 <div class="stat-label">节点进度</div>

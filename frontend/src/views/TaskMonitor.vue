@@ -168,14 +168,12 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="数据记录" width="200" align="center">
+        <el-table-column label="数据记录" width="160" align="center">
           <template #default="{ row }">
             <div class="records-cell">
               <span class="record success">{{ row.successRecords }}</span>
               <span class="record-divider">/</span>
               <span class="record failed">{{ row.failedRecords }}</span>
-              <span class="record-divider">/</span>
-              <span class="record total">{{ row.totalRecords }}</span>
             </div>
           </template>
         </el-table-column>

@@ -35,9 +35,6 @@ public class TaskProgressMessage {
     /** 进度百分比 0-100 */
     private Integer progress;
 
-    /** 总记录数 */
-    private Long totalRecords;
-
     /** 成功记录数 */
     private Long successRecords;
 

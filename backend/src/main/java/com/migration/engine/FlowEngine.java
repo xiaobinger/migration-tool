@@ -76,13 +76,14 @@ public class FlowEngine {
         task.setStatus(TaskStatus.RUNNING);
         task.setStartedAt(LocalDateTime.now());
         task.setCompletedNodes(0);
-        task.setTotalRecords(0L);
-        task.setSuccessRecords(0L);
-        task.setFailedRecords(0L);
-        task.setExtractedRecords(0L);
-        task.setLoadedRecords(0L);
-        task.setLoadedSuccessRecords(0L);
-        task.setLoadedFailedRecords(0L);
+        if (restartFromNodeId == null || restartFromNodeId.isEmpty()) {
+            task.setSuccessRecords(0L);
+            task.setFailedRecords(0L);
+            task.setExtractedRecords(0L);
+            task.setLoadedRecords(0L);
+            task.setLoadedSuccessRecords(0L);
+            task.setLoadedFailedRecords(0L);
+        }
         migrationTaskRepository.save(task);
 
         try {
@@ -237,14 +238,12 @@ public class FlowEngine {
 
             if (node.getNodeType() == NodeType.DATA_EXTRACT) {
                 task.setExtractedRecords(task.getExtractedRecords() + result.totalRecords);
-                task.setTotalRecords(task.getTotalRecords() + result.totalRecords);
                 task.setSuccessRecords(task.getSuccessRecords() + result.successRecords);
                 task.setFailedRecords(task.getFailedRecords() + result.failedRecords);
             } else if (node.getNodeType() == NodeType.DATA_LOAD) {
                 task.setLoadedRecords(task.getLoadedRecords() + result.totalRecords);
                 task.setLoadedSuccessRecords(task.getLoadedSuccessRecords() + result.successRecords);
                 task.setLoadedFailedRecords(task.getLoadedFailedRecords() + result.failedRecords);
-                task.setTotalRecords(task.getTotalRecords() + result.totalRecords);
                 task.setSuccessRecords(task.getSuccessRecords() + result.successRecords);
                 task.setFailedRecords(task.getFailedRecords() + result.failedRecords);
             }
