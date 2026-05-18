@@ -66,7 +66,6 @@ public class FlowEngine {
         executeFlow(task.getId(), task.getFlowDefinitionId(), restartFromNodeId);
     }
 
-    @Transactional
     public MigrationTask executeFlow(Long taskId, Long flowDefinitionId, String restartFromNodeId) {
         MigrationTask task = migrationTaskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("任务不存在: " + taskId));
@@ -124,7 +123,7 @@ public class FlowEngine {
                     }
                 }
                 executedNodes.remove(restartFromNodeId);
-                nodeExecutionRepository.deleteByTaskIdAndNodeIdIn(taskId, List.of(restartFromNodeId));
+                deleteNodeExecutions(taskId, List.of(restartFromNodeId));
                 log.info("从断点续传: restartFromNodeId={}, 已跳过节点数={}", restartFromNodeId, executedNodes.size());
             } else {
                 startNodeId = findStartNode(nodes, edges);
@@ -149,6 +148,11 @@ public class FlowEngine {
         }
 
         return migrationTaskRepository.save(task);
+    }
+
+    @Transactional
+    public void deleteNodeExecutions(Long taskId, List<String> nodeIds) {
+        nodeExecutionRepository.deleteByTaskIdAndNodeIdIn(taskId, nodeIds);
     }
 
     private String findStartNode(List<FlowNode> nodes, List<FlowEdge> edges) {
