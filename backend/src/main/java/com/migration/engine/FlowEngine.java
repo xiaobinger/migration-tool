@@ -9,8 +9,8 @@ import com.migration.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -33,6 +33,7 @@ public class FlowEngine {
     private final NodeExecutionRepository nodeExecutionRepository;
     private final TaskLogRepository taskLogRepository;
     private final NodeHandlerRegistry nodeHandlerRegistry;
+    private final PlatformTransactionManager transactionManager;
 
     private final Map<Long, FlowContext> runningTasks = new ConcurrentHashMap<>();
 
@@ -153,9 +154,10 @@ public class FlowEngine {
         return migrationTaskRepository.save(task);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public void deleteNodeExecutions(Long taskId, List<String> nodeIds) {
-        nodeExecutionRepository.deleteByTaskIdAndNodeIdIn(taskId, nodeIds);
+        new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+            nodeExecutionRepository.deleteByTaskIdAndNodeIdIn(taskId, nodeIds);
+        });
     }
 
     private String findStartNode(List<FlowNode> nodes, List<FlowEdge> edges) {

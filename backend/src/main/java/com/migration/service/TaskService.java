@@ -113,7 +113,22 @@ public class TaskService {
      */
     @Async("taskExecutor")
     public void executeAsync(MigrationTask task, String restartFromNodeId) {
-        flowEngine.execute(task, restartFromNodeId);
+        try {
+            flowEngine.execute(task, restartFromNodeId);
+        } catch (Exception e) {
+            log.error("异步执行任务异常, taskId={}", task.getId(), e);
+            try {
+                MigrationTask latest = taskRepository.findById(task.getId()).orElse(null);
+                if (latest != null && (latest.getStatus() == TaskStatus.PENDING || latest.getStatus() == TaskStatus.RUNNING)) {
+                    latest.setStatus(TaskStatus.FAILED);
+                    latest.setErrorMessage(e.getMessage());
+                    latest.setFinishedAt(java.time.LocalDateTime.now());
+                    taskRepository.save(latest);
+                }
+            } catch (Exception ex) {
+                log.error("更新任务状态失败, taskId={}", task.getId(), ex);
+            }
+        }
     }
 
     @Transactional
