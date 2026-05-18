@@ -1,0 +1,55 @@
+server:
+  port: 18080
+
+spring:
+  application:
+    name: migration-tool
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration
+  datasource:
+    url: jdbc:mysql://192.168.10.204:3306/migration_tool?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: 123456
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+  sql:
+    init:
+      mode: never
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+  mail:
+    host: smtp.qq.com
+    port: 465
+    username: 826545115@qq.com
+    password: ztlxoeeiqnikbcga
+    protocol: smtp
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+            port: 465
+
+migration:
+  thread-pool:
+    core-size: 4
+    max-size: 16
+    queue-capacity: 100
+  log-retention-days: 30
+  ws-push-interval: 500
+  dingtalk:
+    webhook-url: https://oapi.dingtalk.com/robot/send?access_token=a9ef4c02c54af1312a68686a46bde2e9f1feffa2487d61fd533a66c57075fb61
+    secret: SEC639eabb8c2cb160ee8bf08d943f77e435d13ff422f9a33aae1a2662e289ec248

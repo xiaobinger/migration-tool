@@ -1,0 +1,53 @@
+# ========================
+# IDE
+# ========================
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# ========================
+# OS
+# ========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ========================
+# Backend (Java / Maven / Spring Boot)
+# ========================
+backend/target/
+backend/*.jar
+backend/*.war
+backend/*.class
+backend/*.log
+
+# ========================
+# Frontend (Node.js / Vue / Vite)
+# ========================
+frontend/node_modules/
+frontend/dist/
+frontend/*.local
+
+# ========================
+# Database files (H2 legacy)
+# ========================
+data/
+*.mv.db
+*.trace.db
+*.lock.db
+
+# ========================
+# Logs
+# ========================
+*.log
+logs/
+
+# ========================
+# Sensitive config (uncomment if needed)
+# ========================
+# backend/src/main/resources/application.yml
