@@ -49,14 +49,6 @@ public class MigrationTask {
     @Builder.Default
     private Integer completedNodes = 0;
 
-    /** 成功记录数 */
-    @Builder.Default
-    private Long successRecords = 0L;
-
-    /** 失败记录数 */
-    @Builder.Default
-    private Long failedRecords = 0L;
-
     /** 提取记录数 */
     @Builder.Default
     private Long extractedRecords = 0L;

@@ -68,49 +68,35 @@
         </el-card>
 
         <el-card class="stats-card">
-          <el-row :gutter="16">
-            <el-col :span="6">
+          <el-row :gutter="20">
+            <el-col :span="4">
+              <div class="stat-item">
+                <div class="stat-value">{{ taskStore.currentTask.completedNodes }}/{{ taskStore.currentTask.totalNodes }}</div>
+                <div class="stat-label">节点进度</div>
+              </div>
+            </el-col>
+            <el-col :span="5">
               <div class="stat-item extract">
                 <div class="stat-value">{{ taskStore.currentTask.extractedRecords ?? 0 }}</div>
-                <div class="stat-label">提取记录数</div>
+                <div class="stat-label">提取记录</div>
               </div>
             </el-col>
-            <el-col :span="6">
+            <el-col :span="5">
               <div class="stat-item load">
                 <div class="stat-value">{{ taskStore.currentTask.loadedRecords ?? 0 }}</div>
-                <div class="stat-label">加载记录数</div>
+                <div class="stat-label">加载记录</div>
               </div>
             </el-col>
-            <el-col :span="6">
+            <el-col :span="5">
               <div class="stat-item success">
                 <div class="stat-value">{{ taskStore.currentTask.loadedSuccessRecords ?? 0 }}</div>
                 <div class="stat-label">加载成功</div>
               </div>
             </el-col>
-            <el-col :span="6">
+            <el-col :span="5">
               <div class="stat-item failed">
                 <div class="stat-value">{{ taskStore.currentTask.loadedFailedRecords ?? 0 }}</div>
                 <div class="stat-label">加载失败</div>
-              </div>
-            </el-col>
-          </el-row>
-          <el-row :gutter="16" style="margin-top: 12px">
-            <el-col :span="8">
-              <div class="stat-item">
-                <div class="stat-value">{{ taskStore.currentTask.successRecords ?? 0 }}</div>
-                <div class="stat-label">总成功</div>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="stat-item">
-                <div class="stat-value">{{ taskStore.currentTask.failedRecords ?? 0 }}</div>
-                <div class="stat-label">总失败</div>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="stat-item">
-                <div class="stat-value">{{ taskStore.currentTask.completedNodes }}/{{ taskStore.currentTask.totalNodes }}</div>
-                <div class="stat-label">节点进度</div>
               </div>
             </el-col>
           </el-row>

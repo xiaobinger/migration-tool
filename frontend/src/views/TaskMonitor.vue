@@ -90,16 +90,16 @@
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" stroke-width="2"/>
                 <path d="M22 4L12 14.01l-3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
-              <span>成功</span>
-              <strong>{{ task.successRecords }}</strong>
+              <span>加载成功</span>
+              <strong>{{ task.loadedSuccessRecords ?? 0 }}</strong>
             </div>
             <div class="stat-item failed">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
                 <path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
-              <span>失败</span>
-              <strong>{{ task.failedRecords }}</strong>
+              <span>加载失败</span>
+              <strong>{{ task.loadedFailedRecords ?? 0 }}</strong>
             </div>
           </div>
 
@@ -168,12 +168,16 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="数据记录" width="160" align="center">
+        <el-table-column label="数据记录" width="200" align="center">
           <template #default="{ row }">
             <div class="records-cell">
-              <span class="record success">{{ row.successRecords }}</span>
+              <span class="record extract">{{ row.extractedRecords ?? 0 }}</span>
               <span class="record-divider">/</span>
-              <span class="record failed">{{ row.failedRecords }}</span>
+              <span class="record load">{{ row.loadedRecords ?? 0 }}</span>
+              <span class="record-divider">/</span>
+              <span class="record success">{{ row.loadedSuccessRecords ?? 0 }}</span>
+              <span class="record-divider">/</span>
+              <span class="record failed">{{ row.loadedFailedRecords ?? 0 }}</span>
             </div>
           </template>
         </el-table-column>
@@ -831,6 +835,8 @@ function tableRowClassName({ row }: { row: MigrationTask }) {
   font-weight: 500;
 }
 
+.record.extract { color: #409EFF; }
+.record.load { color: #E6A23C; }
 .record.success { color: #10b981; }
 .record.failed { color: #ef4444; }
 .record.total { color: #64748b; }

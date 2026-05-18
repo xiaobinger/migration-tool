@@ -35,11 +35,17 @@ public class TaskProgressMessage {
     /** 进度百分比 0-100 */
     private Integer progress;
 
-    /** 成功记录数 */
-    private Long successRecords;
+    /** 提取记录数 */
+    private Long extractedRecords;
 
-    /** 失败记录数 */
-    private Long failedRecords;
+    /** 加载记录数 */
+    private Long loadedRecords;
+
+    /** 加载成功记录数 */
+    private Long loadedSuccessRecords;
+
+    /** 加载失败记录数 */
+    private Long loadedFailedRecords;
 
     /** 消息内容 */
     private String message;

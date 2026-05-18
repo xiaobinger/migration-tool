@@ -121,7 +121,8 @@ public class TaskService {
                 MigrationTask latest = taskRepository.findById(task.getId()).orElse(null);
                 if (latest != null && (latest.getStatus() == TaskStatus.PENDING || latest.getStatus() == TaskStatus.RUNNING)) {
                     latest.setStatus(TaskStatus.FAILED);
-                    latest.setErrorMessage(e.getMessage());
+                    latest.setErrorMessage(e.getMessage() != null && e.getMessage().length() > 2000
+                            ? e.getMessage().substring(0, 2000) : e.getMessage());
                     latest.setFinishedAt(java.time.LocalDateTime.now());
                     taskRepository.save(latest);
                 }

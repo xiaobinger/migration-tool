@@ -95,8 +95,10 @@ export interface MigrationTask {
   currentNodeId?: string
   totalNodes: number
   completedNodes: number
-  successRecords: number
-  failedRecords: number
+  extractedRecords: number
+  loadedRecords: number
+  loadedSuccessRecords: number
+  loadedFailedRecords: number
   errorMessage?: string
   restartFromNodeId?: string
   createdBy?: string
@@ -156,8 +158,10 @@ export interface TaskProgressMessage {
   taskStatus?: string
   nodeStatus?: string
   progress?: number
-  successRecords?: number
-  failedRecords?: number
+  extractedRecords?: number
+  loadedRecords?: number
+  loadedSuccessRecords?: number
+  loadedFailedRecords?: number
   message?: string
   error?: string
   timestamp: number

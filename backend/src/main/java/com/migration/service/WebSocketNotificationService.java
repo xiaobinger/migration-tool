@@ -42,8 +42,10 @@ public class WebSocketNotificationService {
                 .taskId(task.getId())
                 .taskStatus(task.getStatus().name())
                 .progress(100)
-                .successRecords(task.getSuccessRecords())
-                .failedRecords(task.getFailedRecords())
+                .extractedRecords(task.getExtractedRecords())
+                .loadedRecords(task.getLoadedRecords())
+                .loadedSuccessRecords(task.getLoadedSuccessRecords())
+                .loadedFailedRecords(task.getLoadedFailedRecords())
                 .timestamp(System.currentTimeMillis())
                 .build();
         webSocket.broadcast(message);
@@ -95,8 +97,10 @@ public class WebSocketNotificationService {
                 .nodeName(node.getName())
                 .nodeStatus("SUCCESS")
                 .progress(progress)
-                .successRecords(result.getSuccessRecords())
-                .failedRecords(result.getFailedRecords())
+                .extractedRecords(task.getExtractedRecords())
+                .loadedRecords(task.getLoadedRecords())
+                .loadedSuccessRecords(task.getLoadedSuccessRecords())
+                .loadedFailedRecords(task.getLoadedFailedRecords())
                 .message(result.getSummary())
                 .timestamp(System.currentTimeMillis())
                 .build();
@@ -134,8 +138,10 @@ public class WebSocketNotificationService {
                 .taskId(task.getId())
                 .taskStatus(task.getStatus().name())
                 .progress(progress)
-                .successRecords(task.getSuccessRecords())
-                .failedRecords(task.getFailedRecords())
+                .extractedRecords(task.getExtractedRecords())
+                .loadedRecords(task.getLoadedRecords())
+                .loadedSuccessRecords(task.getLoadedSuccessRecords())
+                .loadedFailedRecords(task.getLoadedFailedRecords())
                 .timestamp(System.currentTimeMillis())
                 .build();
         webSocket.broadcast(message);
