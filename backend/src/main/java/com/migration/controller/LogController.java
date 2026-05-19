@@ -3,10 +3,7 @@ package com.migration.controller;
 import com.migration.engine.FlowEngine;
 import com.migration.engine.ImplementationClassRegistry;
 import com.migration.loader.DataLoader;
-import com.migration.model.entity.FlowNode;
-import com.migration.model.entity.LoadFailureRecord;
-import com.migration.model.entity.MigrationTask;
-import com.migration.model.entity.NodeExecution;
+import com.migration.model.entity.*;
 import com.migration.repository.FlowNodeRepository;
 import com.migration.repository.LoadFailureRecordRepository;
 import com.migration.repository.MigrationTaskRepository;
@@ -147,32 +144,39 @@ public class LogController {
             try {
                 FlowEngine.NodeResult result = loader.execute(context, node);
 
-                if (result.isSuccess()) {
-                    for (LoadFailureRecord r : nodeFailures) {
-                        r.setRetried(true);
-                        r.setRetriedAt(LocalDateTime.now());
+                Set<String> stillFailedRowData = new HashSet<>();
+                if (result.getFailedRows() != null) {
+                    for (FlowEngine.FailedRow fr : result.getFailedRows()) {
+                        stillFailedRowData.add(fr.getRowData());
                     }
-                    totalSuccess += nodeFailures.size();
+                }
 
+                long nodeRetrySuccess = 0;
+                for (LoadFailureRecord r : nodeFailures) {
+                    r.setRetried(true);
+                    r.setRetriedAt(LocalDateTime.now());
+                    if (stillFailedRowData.contains(r.getRowData())) {
+                        String newError = result.getFailedRows().stream()
+                                .filter(fr -> fr.getRowData().equals(r.getRowData()))
+                                .map(FlowEngine.FailedRow::getErrorMessage)
+                                .findFirst()
+                                .orElse("重试仍失败");
+                        r.setErrorMessage("重试仍失败: " + newError);
+                        stillFailed.add(r);
+                        totalFail++;
+                    } else {
+                        nodeRetrySuccess++;
+                        totalSuccess++;
+                    }
+                }
+
+                if (nodeRetrySuccess > 0) {
                     synchronized (task) {
-                        task.setLoadedSuccessRecords(task.getLoadedSuccessRecords() + result.getSuccessRecords());
-                        task.setLoadedFailedRecords(Math.max(0, task.getLoadedFailedRecords() - result.getSuccessRecords()));
+                        task.setLoadedSuccessRecords(task.getLoadedSuccessRecords() + nodeRetrySuccess);
+                        task.setLoadedFailedRecords(Math.max(0, task.getLoadedFailedRecords() - nodeRetrySuccess));
                         migrationTaskRepository.save(task);
                     }
                     webSocketNotificationService.notifyProgress(task);
-                } else {
-                    List<FlowEngine.FailedRow> newFailedRows = result.getFailedRows();
-                    int newFailIndex = 0;
-                    for (LoadFailureRecord r : nodeFailures) {
-                        r.setRetried(true);
-                        r.setRetriedAt(LocalDateTime.now());
-                        if (newFailedRows != null && newFailIndex < newFailedRows.size()) {
-                            r.setErrorMessage("重试仍失败: " + newFailedRows.get(newFailIndex).getErrorMessage());
-                        }
-                        stillFailed.add(r);
-                        newFailIndex++;
-                    }
-                    totalFail += nodeFailures.size();
                 }
             } catch (Exception e) {
                 for (LoadFailureRecord r : nodeFailures) {
