@@ -90,12 +90,15 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function handleProgressMessage(msg: TaskProgressMessage) {
-    // 只处理当前任务的消息
     if (currentTask.value && msg.taskId === currentTask.value.id) {
       switch (msg.type) {
         case 'progress':
           progress.value = msg.progress || 0
           activeNodeId.value = msg.nodeId || null
+          if (msg.extractedRecords != null) currentTask.value.extractedRecords = msg.extractedRecords
+          if (msg.loadedRecords != null) currentTask.value.loadedRecords = msg.loadedRecords
+          if (msg.loadedSuccessRecords != null) currentTask.value.loadedSuccessRecords = msg.loadedSuccessRecords
+          if (msg.loadedFailedRecords != null) currentTask.value.loadedFailedRecords = msg.loadedFailedRecords
           break
         case 'node_start':
           nodeStatusMap[msg.nodeId!] = 'RUNNING'
@@ -103,18 +106,33 @@ export const useTaskStore = defineStore('task', () => {
           break
         case 'node_complete':
           nodeStatusMap[msg.nodeId!] = 'SUCCESS'
+          if (msg.progress != null) progress.value = msg.progress
+          if (msg.extractedRecords != null) currentTask.value.extractedRecords = msg.extractedRecords
+          if (msg.loadedRecords != null) currentTask.value.loadedRecords = msg.loadedRecords
+          if (msg.loadedSuccessRecords != null) currentTask.value.loadedSuccessRecords = msg.loadedSuccessRecords
+          if (msg.loadedFailedRecords != null) currentTask.value.loadedFailedRecords = msg.loadedFailedRecords
           break
         case 'node_error':
           nodeStatusMap[msg.nodeId!] = 'FAILED'
           break
         case 'task_complete':
-          if (currentTask.value) currentTask.value.status = 'SUCCESS'
+          if (currentTask.value) {
+            currentTask.value.status = 'SUCCESS'
+            if (msg.extractedRecords != null) currentTask.value.extractedRecords = msg.extractedRecords
+            if (msg.loadedRecords != null) currentTask.value.loadedRecords = msg.loadedRecords
+            if (msg.loadedSuccessRecords != null) currentTask.value.loadedSuccessRecords = msg.loadedSuccessRecords
+            if (msg.loadedFailedRecords != null) currentTask.value.loadedFailedRecords = msg.loadedFailedRecords
+          }
           progress.value = 100
           break
         case 'task_failed':
           if (currentTask.value) {
             currentTask.value.status = 'FAILED'
             currentTask.value.errorMessage = msg.error
+            if (msg.extractedRecords != null) currentTask.value.extractedRecords = msg.extractedRecords
+            if (msg.loadedRecords != null) currentTask.value.loadedRecords = msg.loadedRecords
+            if (msg.loadedSuccessRecords != null) currentTask.value.loadedSuccessRecords = msg.loadedSuccessRecords
+            if (msg.loadedFailedRecords != null) currentTask.value.loadedFailedRecords = msg.loadedFailedRecords
           }
           break
       }

@@ -8,6 +8,8 @@ import com.migration.model.enums.LogLevel;
 import com.migration.model.enums.NodeType;
 import com.migration.model.enums.TaskStatus;
 import com.migration.repository.*;
+import com.migration.service.WebSocketNotificationService;
+import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -38,6 +40,7 @@ public class FlowEngine {
     private final NodeHandlerRegistry nodeHandlerRegistry;
     private final PlatformTransactionManager transactionManager;
     private final LoadFailureRecordRepository loadFailureRecordRepository;
+    private final WebSocketNotificationService webSocketNotificationService;
 
     private final Map<Long, FlowContext> runningTasks = new ConcurrentHashMap<>();
 
@@ -78,14 +81,15 @@ public class FlowEngine {
 
         task.setStatus(TaskStatus.RUNNING);
         task.setStartedAt(LocalDateTime.now());
-        task.setCompletedNodes(0);
         if (restartFromNodeId == null || restartFromNodeId.isEmpty()) {
+            task.setCompletedNodes(0);
             task.setExtractedRecords(0L);
             task.setLoadedRecords(0L);
             task.setLoadedSuccessRecords(0L);
             task.setLoadedFailedRecords(0L);
         }
         migrationTaskRepository.save(task);
+        webSocketNotificationService.notifyTaskStart(task);
 
         try {
             List<FlowNode> nodes = flowNodeRepository.findByFlowDefinitionIdOrderBySortOrder(flowDefinitionId);
@@ -129,6 +133,8 @@ public class FlowEngine {
                 }
                 executedNodes.remove(restartFromNodeId);
                 deleteNodeExecutions(taskId, List.of(restartFromNodeId));
+                task.setCompletedNodes(executedNodes.size());
+                migrationTaskRepository.save(task);
                 log.info("从断点续传: restartFromNodeId={}, 已跳过节点数={}", restartFromNodeId, executedNodes.size());
             } else {
                 startNodeId = findStartNode(nodes, edges);
@@ -152,7 +158,13 @@ public class FlowEngine {
             runningTasks.remove(taskId);
         }
 
-        return migrationTaskRepository.save(task);
+        MigrationTask savedTask = migrationTaskRepository.save(task);
+        if (savedTask.getStatus() == TaskStatus.SUCCESS) {
+            webSocketNotificationService.notifyTaskComplete(savedTask);
+        } else if (savedTask.getStatus() == TaskStatus.FAILED) {
+            webSocketNotificationService.notifyTaskFailed(savedTask, savedTask.getErrorMessage());
+        }
+        return savedTask;
     }
 
     public void deleteNodeExecutions(Long taskId, List<String> nodeIds) {
@@ -171,6 +183,12 @@ public class FlowEngine {
                 .findFirst()
                 .map(FlowNode::getNodeId)
                 .orElse(null);
+    }
+
+    private void updateCompletedNodes(MigrationTask task, Set<String> executedNodes) {
+        synchronized (task) {
+            task.setCompletedNodes(executedNodes.size());
+        }
     }
 
     private void executeNode(String nodeId, String incomingEdgeId,
@@ -218,6 +236,8 @@ public class FlowEngine {
                 .message(String.format("节点 [%s] 开始执行, 类型: %s", node.getName(), node.getNodeType().getLabel()))
                 .build());
 
+        webSocketNotificationService.notifyNodeStart(task, node);
+
         try {
             NodeExecutor executor = nodeHandlerRegistry.getHandler(node.getNodeType());
             NodeResult result;
@@ -235,7 +255,7 @@ public class FlowEngine {
             record.setFinishedAt(LocalDateTime.now());
             record.setDuration(Duration.between(record.getStartedAt(), record.getFinishedAt()).toMillis());
 
-            task.setCompletedNodes(task.getCompletedNodes() + 1);
+            updateCompletedNodes(task, executedNodes);
 
             if (node.getNodeType() == NodeType.DATA_EXTRACT) {
                 task.setExtractedRecords(task.getExtractedRecords() + result.totalRecords);
@@ -260,6 +280,9 @@ public class FlowEngine {
                 }
             }
 
+            migrationTaskRepository.save(task);
+            webSocketNotificationService.notifyNodeComplete(task, node, result);
+
             taskLogRepository.save(TaskLog.builder()
                     .taskId(task.getId())
                     .nodeId(nodeId)
@@ -278,7 +301,7 @@ public class FlowEngine {
             record.setDuration(Duration.between(record.getStartedAt(), record.getFinishedAt()).toMillis());
             context.getNodeResults().put(nodeId, NodeResult.fail(e.getMessage()));
 
-            task.setCompletedNodes(task.getCompletedNodes() + 1);
+            updateCompletedNodes(task, executedNodes);
             task.setRestartFromNodeId(nodeId);
             migrationTaskRepository.save(task);
 
@@ -691,7 +714,7 @@ public class FlowEngine {
             record.setDuration(Duration.between(record.getStartedAt(), record.getFinishedAt()).toMillis());
 
             synchronized (task) {
-                task.setCompletedNodes(task.getCompletedNodes() + 1);
+                task.setCompletedNodes(executedNodes.size());
                 if (node.getNodeType() == NodeType.DATA_EXTRACT) {
                     task.setExtractedRecords(task.getExtractedRecords() + result.totalRecords);
                 } else if (node.getNodeType() == NodeType.DATA_LOAD) {
@@ -700,6 +723,24 @@ public class FlowEngine {
                     task.setLoadedFailedRecords(task.getLoadedFailedRecords() + result.failedRecords);
                 }
             }
+
+            if (node.getNodeType() == NodeType.DATA_LOAD && result.failedRows != null && !result.failedRows.isEmpty()) {
+                for (FlowEngine.FailedRow fr : result.failedRows) {
+                    loadFailureRecordRepository.save(LoadFailureRecord.builder()
+                            .taskId(task.getId())
+                            .nodeExecutionId(record.getId())
+                            .nodeId(nodeId)
+                            .nodeName(node.getName())
+                            .targetTable(getConfig(node, "table", getConfig(node, "collection", "")))
+                            .rowData(fr.getRowData())
+                            .errorMessage(fr.getErrorMessage())
+                            .retried(false)
+                            .build());
+                }
+            }
+
+            migrationTaskRepository.save(task);
+            webSocketNotificationService.notifyNodeComplete(task, node, result);
 
             return result;
         } catch (Exception e) {

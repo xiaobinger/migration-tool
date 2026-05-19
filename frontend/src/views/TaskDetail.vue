@@ -71,7 +71,7 @@
           <el-row :gutter="20">
             <el-col :span="4">
               <div class="stat-item">
-                <div class="stat-value">{{ taskStore.currentTask.completedNodes }}/{{ taskStore.currentTask.totalNodes }}</div>
+                <div class="stat-value">{{ taskStore.currentTask.completedNodes ?? 0 }}/{{ taskStore.currentTask.totalNodes ?? 0 }}</div>
                 <div class="stat-label">节点进度</div>
               </div>
             </el-col>
@@ -94,7 +94,7 @@
               </div>
             </el-col>
             <el-col :span="5">
-              <div class="stat-item failed clickable" @click="showFailureDialog">
+              <div class="stat-item clickable" :class="{ 'has-failures': (taskStore.currentTask.loadedFailedRecords ?? 0) > 0 }" @click="showFailureDialog">
                 <div class="stat-value">{{ taskStore.currentTask.loadedFailedRecords ?? 0 }}</div>
                 <div class="stat-label">加载失败</div>
               </div>
@@ -161,6 +161,30 @@
             </div>
           </template>
           <ErrorAnalysis :analysis="errorAnalysis" />
+        </el-card>
+
+        <el-card class="failure-card" v-if="failureRecords.length > 0">
+          <template #header>
+            <div class="card-title">
+              <span>加载失败记录 ({{ failureRecords.length }})</span>
+              <div>
+                <el-button size="small" text @click="showFailureDialog">查看详情</el-button>
+                <el-button type="danger" size="small" text @click="handleClearFailures">清除</el-button>
+              </div>
+            </div>
+          </template>
+          <div class="failure-summary">
+            <div v-for="record in failureRecords.slice(0, 5)" :key="record.id" class="failure-item">
+              <div class="failure-item-header">
+                <el-tag type="danger" size="small">{{ record.nodeName }}</el-tag>
+                <span class="failure-table">{{ record.targetTable }}</span>
+              </div>
+              <div class="failure-error">{{ record.errorMessage }}</div>
+            </div>
+            <div v-if="failureRecords.length > 5" class="failure-more" @click="showFailureDialog">
+              还有 {{ failureRecords.length - 5 }} 条失败记录，点击查看全部
+            </div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -282,9 +306,27 @@ onMounted(async () => {
 
   await Promise.all([loadLogs(), loadExecutions()])
 
-  logPolling = window.setInterval(() => {
-    loadLogs()
-    loadExecutions()
+  if (taskStore.currentTask) {
+    const status = taskStore.currentTask.status
+    if (status === 'SUCCESS' || status === 'FAILED' || status === 'PARTIAL_SUCCESS') {
+      try {
+        failureRecords.value = await logApi.loadFailures(taskStore.currentTask.id)
+      } catch { /* ignore */ }
+    }
+  }
+
+  logPolling = window.setInterval(async () => {
+    await loadLogs()
+    await loadExecutions()
+    if (taskStore.currentTask) {
+      const status = taskStore.currentTask.status
+      if (status === 'SUCCESS' || status === 'FAILED' || status === 'PARTIAL_SUCCESS' || status === 'CANCELLED') {
+        if (logPolling) clearInterval(logPolling)
+        try {
+          failureRecords.value = await logApi.loadFailures(taskStore.currentTask.id)
+        } catch { /* ignore */ }
+      }
+    }
   }, 3000)
 })
 
@@ -527,4 +569,15 @@ function formatDuration(ms: number): string {
 .log-card { margin-bottom: 16px; }
 .log-card :deep(.el-card__body) { max-height: 300px; overflow-y: auto; }
 .error-card :deep(.el-card__body) { max-height: 300px; overflow-y: auto; }
+.failure-card { margin-bottom: 16px; }
+.failure-card :deep(.el-card__body) { max-height: 300px; overflow-y: auto; }
+.failure-summary { display: flex; flex-direction: column; gap: 8px; }
+.failure-item { padding: 8px; background: #fef0f0; border-radius: 6px; border-left: 3px solid #F56C6C; }
+.failure-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.failure-table { font-size: 12px; color: #909399; }
+.failure-error { font-size: 12px; color: #F56C6C; line-height: 1.4; word-break: break-all; }
+.failure-more { text-align: center; color: #409EFF; font-size: 12px; cursor: pointer; padding: 4px 0; }
+.failure-more:hover { text-decoration: underline; }
+.stat-item.has-failures .stat-value { color: #F56C6C; animation: failurePulse 2s infinite; }
+@keyframes failurePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 </style>

@@ -139,3 +139,21 @@ CREATE TABLE IF NOT EXISTS `task_log` (
     KEY `idx_task_log_task_id` (`task_id`),
     KEY `idx_task_log_task_node` (`task_id`, `node_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS load_failure_record;
+CREATE TABLE IF NOT EXISTS `load_failure_record` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `task_id` BIGINT NOT NULL,
+    `node_execution_id` BIGINT,
+    `node_id` VARCHAR(255),
+    `node_name` VARCHAR(255),
+    `target_table` VARCHAR(255),
+    `row_data` TEXT,
+    `error_message` TEXT,
+    `retried` BIT(1) DEFAULT 0,
+    `failed_at` DATETIME,
+    `retried_at` DATETIME,
+    PRIMARY KEY (`id`),
+    KEY `idx_load_failure_task_id` (`task_id`),
+    KEY `idx_load_failure_task_node` (`task_id`, `node_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
