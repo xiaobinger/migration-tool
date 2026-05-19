@@ -72,7 +72,6 @@ public class MySQLDataLoader implements DataLoader {
         log.info("加载到MySQL: {}, table={}, mode={}, 数据量={}", jdbcUrl, table, writeMode, dataRows.size());
 
         long successRecords = 0;
-        long failedRecords = 0;
         List<FlowEngine.FailedRow> failedRows = new ArrayList<>();
 
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
@@ -85,44 +84,30 @@ public class MySQLDataLoader implements DataLoader {
             log.debug("INSERT SQL: {}", sql);
 
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                int batchCount = 0;
+                List<Map<String, Object>> currentBatch = new ArrayList<>();
                 for (Map<String, Object> row : dataRows) {
                     try {
                         for (int i = 0; i < columns.size(); i++) {
                             ps.setObject(i + 1, row.get(columns.get(i)));
                         }
                         ps.addBatch();
-                        batchCount++;
+                        currentBatch.add(row);
 
-                        if (batchCount >= batchSize) {
-                            ps.executeBatch();
-                            successRecords += batchCount;
-                            batchCount = 0;
+                        if (currentBatch.size() >= batchSize) {
+                            successRecords += executeBatchWithTracking(ps, currentBatch, failedRows);
+                            currentBatch.clear();
                         }
                     } catch (Exception e) {
-                        failedRecords++;
-                        String rowDataJson = JSONUtil.toJsonStr(row);
                         failedRows.add(FlowEngine.FailedRow.builder()
-                                .rowData(rowDataJson)
+                                .rowData(JSONUtil.toJsonStr(row))
                                 .errorMessage(e.getMessage())
                                 .build());
                         log.warn("行写入失败: {}", e.getMessage());
                     }
                 }
-                if (batchCount > 0) {
-                    try {
-                        ps.executeBatch();
-                        successRecords += batchCount;
-                    } catch (BatchUpdateException e) {
-                        int[] updateCounts = e.getUpdateCounts();
-                        for (int i = 0; i < updateCounts.length; i++) {
-                            if (updateCounts[i] == Statement.EXECUTE_FAILED) {
-                                failedRecords++;
-                                successRecords--;
-                            }
-                        }
-                        log.warn("批量写入部分失败: {}", e.getMessage());
-                    }
+                if (!currentBatch.isEmpty()) {
+                    successRecords += executeBatchWithTracking(ps, currentBatch, failedRows);
+                    currentBatch.clear();
                 }
             }
             conn.commit();
@@ -133,11 +118,42 @@ public class MySQLDataLoader implements DataLoader {
 
         context.getVariables().put(node.getNodeId() + "_loaded", successRecords);
 
+        long totalFailed = failedRows.size();
         String summary = String.format("数据加载到MySQL [%s.%s] 完成，共 %d 条，成功 %d 条，失败 %d 条，模式: %s",
-                database, table, dataRows.size(), successRecords, failedRecords, writeMode);
-        FlowEngine.NodeResult result = FlowEngine.NodeResult.ok(summary, dataRows.size(), successRecords, failedRecords);
+                database, table, dataRows.size(), successRecords, totalFailed, writeMode);
+        FlowEngine.NodeResult result = FlowEngine.NodeResult.ok(summary, dataRows.size(), successRecords, totalFailed);
         result.setFailedRows(failedRows);
         return result;
+    }
+
+    private long executeBatchWithTracking(PreparedStatement ps,
+                                           List<Map<String, Object>> currentBatch,
+                                           List<FlowEngine.FailedRow> failedRows) throws SQLException {
+        long batchSuccess = 0;
+        try {
+            ps.executeBatch();
+            batchSuccess = currentBatch.size();
+        } catch (BatchUpdateException e) {
+            int[] updateCounts = e.getUpdateCounts();
+            for (int i = 0; i < updateCounts.length; i++) {
+                if (updateCounts[i] == Statement.EXECUTE_FAILED || updateCounts[i] < 0) {
+                    failedRows.add(FlowEngine.FailedRow.builder()
+                            .rowData(JSONUtil.toJsonStr(currentBatch.get(i)))
+                            .errorMessage(e.getMessage())
+                            .build());
+                } else {
+                    batchSuccess++;
+                }
+            }
+            for (int i = updateCounts.length; i < currentBatch.size(); i++) {
+                failedRows.add(FlowEngine.FailedRow.builder()
+                        .rowData(JSONUtil.toJsonStr(currentBatch.get(i)))
+                        .errorMessage("Batch execution failed")
+                        .build());
+            }
+            log.warn("批量写入部分失败: 成功={}, 失败={}, 原因={}", batchSuccess, currentBatch.size() - batchSuccess, e.getMessage());
+        }
+        return batchSuccess;
     }
 
     private String buildInsertSql(String table, List<String> columns, String writeMode, String onDuplicateKey) {
