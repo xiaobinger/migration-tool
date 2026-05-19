@@ -534,7 +534,12 @@ const parameterGroups = computed(() => {
 
 function isParamVisible(param: ParameterInfo): boolean {
   if (param.name === 'table' && param.inputType === 'table-select') {
-    return configForm.value.queryMode === 'table'
+    const params = selectedImplementation.value?.parameters || []
+    const hasQueryMode = params.some(p => p.name === 'queryMode')
+    if (hasQueryMode) {
+      return configForm.value.queryMode === 'table'
+    }
+    return true
   }
   if (param.name === 'script' && param.inputType === 'textarea') {
     const params = selectedImplementation.value?.parameters || []
@@ -544,7 +549,11 @@ function isParamVisible(param: ParameterInfo): boolean {
     }
   }
   if (param.name === 'whereClause') {
-    return configForm.value.queryMode === 'table'
+    const params = selectedImplementation.value?.parameters || []
+    const hasQueryMode = params.some(p => p.name === 'queryMode')
+    if (hasQueryMode) {
+      return configForm.value.queryMode === 'table'
+    }
   }
   return true
 }
