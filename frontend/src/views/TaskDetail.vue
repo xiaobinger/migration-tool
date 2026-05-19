@@ -94,7 +94,7 @@
               </div>
             </el-col>
             <el-col :span="5">
-              <div class="stat-item failed">
+              <div class="stat-item failed clickable" @click="showFailureDialog">
                 <div class="stat-value">{{ taskStore.currentTask.loadedFailedRecords ?? 0 }}</div>
                 <div class="stat-label">加载失败</div>
               </div>
@@ -164,6 +164,47 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <el-dialog v-model="failureDialogVisible" title="加载失败记录" width="80%" top="5vh">
+      <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <span>共 {{ failureRecords.length }} 条失败记录，其中 {{ failureRecords.filter(r => !r.retried).length }} 条未重试</span>
+        <div>
+          <el-button type="warning" size="small" @click="handleRetryFailures" :loading="retryLoading">
+            标记为待重试
+          </el-button>
+          <el-button type="danger" size="small" @click="handleClearFailures">
+            清除记录
+          </el-button>
+        </div>
+      </div>
+      <el-table :data="failureRecords" border max-height="500" size="small">
+        <el-table-column type="index" width="50" label="#" />
+        <el-table-column prop="nodeName" label="节点" width="120" />
+        <el-table-column prop="targetTable" label="目标表" width="150" />
+        <el-table-column prop="rowData" label="失败数据" min-width="300">
+          <template #default="{ row }">
+            <el-tooltip :content="row.rowData" placement="top" :show-after="300">
+              <div class="failure-data-cell">{{ row.rowData }}</div>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="errorMessage" label="失败原因" min-width="250">
+          <template #default="{ row }">
+            <el-tooltip :content="row.errorMessage" placement="top" :show-after="300">
+              <div class="failure-data-cell">{{ row.errorMessage }}</div>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="retried" label="重试状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.retried ? 'success' : 'info'" size="small">
+              {{ row.retried ? '已重试' : '未重试' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="failedAt" label="失败时间" width="170" />
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -176,7 +217,7 @@ import { useTaskStore } from '../stores/task'
 import { useFlowStore } from '../stores/flow'
 import { logApi } from '../api/log'
 import { getTaskStatusLabel, getTaskStatusColor } from '../types'
-import type { TaskLog, NodeExecution, ErrorAnalysis as ErrorAnalysisType, TaskStatusCode } from '../types'
+import type { TaskLog, NodeExecution, ErrorAnalysis as ErrorAnalysisType, TaskStatusCode, LoadFailureRecord } from '../types'
 import type { FlowDefinition } from '../stores/flow'
 import FlowCanvas from '../components/FlowCanvas.vue'
 import CanvasToolbar from '../components/CanvasToolbar.vue'
@@ -191,6 +232,9 @@ const flowDefinition = ref<FlowDefinition | null>(null)
 const logs = ref<TaskLog[]>([])
 const nodeExecutions = ref<NodeExecution[]>([])
 const errorAnalysis = ref<ErrorAnalysisType | null>(null)
+const failureDialogVisible = ref(false)
+const failureRecords = ref<LoadFailureRecord[]>([])
+const retryLoading = ref(false)
 const edgeStyle = ref<'straight' | 'orthogonal' | 'curved'>('straight')
 const showAnimation = ref(true)
 const flowCanvasRef = ref<InstanceType<typeof FlowCanvas> | null>(null)
@@ -292,6 +336,34 @@ async function loadErrorAnalysis() {
   } catch (e) { /* ignore */ }
 }
 
+async function showFailureDialog() {
+  if (!taskStore.currentTask) return
+  failureDialogVisible.value = true
+  try {
+    failureRecords.value = await logApi.loadFailures(taskStore.currentTask.id)
+  } catch (e) { /* ignore */ }
+}
+
+async function handleRetryFailures() {
+  if (!taskStore.currentTask) return
+  retryLoading.value = true
+  try {
+    const res = await logApi.retryLoadFailures(taskStore.currentTask.id)
+    ElMessage.success(res.message || '已标记为待重试')
+    failureRecords.value = await logApi.loadFailures(taskStore.currentTask.id)
+  } catch (e) { /* ignore */ }
+  retryLoading.value = false
+}
+
+async function handleClearFailures() {
+  if (!taskStore.currentTask) return
+  try {
+    await logApi.clearLoadFailures(taskStore.currentTask.id)
+    failureRecords.value = []
+    ElMessage.success('已清除失败记录')
+  } catch (e) { /* ignore */ }
+}
+
 function handleNodeClick(nodeId: string) {
   const exec = nodeExecutions.value.find(e => e.nodeId === nodeId)
   if (exec) {
@@ -375,6 +447,9 @@ function formatDuration(ms: number): string {
 .stat-item.load .stat-value { color: #E6A23C; }
 .stat-item.success .stat-value { color: #67C23A; }
 .stat-item.failed .stat-value { color: #F56C6C; }
+.stat-item.clickable { cursor: pointer; transition: transform 0.15s; }
+.stat-item.clickable:hover { transform: scale(1.08); }
+.failure-data-cell { max-height: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-family: monospace; }
 .stat-label { font-size: 12px; color: #909399; margin-top: 4px; }
 
 .executions-card { margin-bottom: 16px; }

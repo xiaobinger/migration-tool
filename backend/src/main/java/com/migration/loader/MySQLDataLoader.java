@@ -1,5 +1,6 @@
 package com.migration.loader;
 
+import cn.hutool.json.JSONUtil;
 import com.migration.engine.FlowEngine;
 import com.migration.model.entity.FlowNode;
 import com.migration.service.DataSourceConfigService;
@@ -72,6 +73,7 @@ public class MySQLDataLoader implements DataLoader {
 
         long successRecords = 0;
         long failedRecords = 0;
+        List<FlowEngine.FailedRow> failedRows = new ArrayList<>();
 
         try (Connection conn = DriverManager.getConnection(jdbcUrl, username, password)) {
             conn.setAutoCommit(false);
@@ -99,12 +101,28 @@ public class MySQLDataLoader implements DataLoader {
                         }
                     } catch (Exception e) {
                         failedRecords++;
+                        String rowDataJson = JSONUtil.toJsonStr(row);
+                        failedRows.add(FlowEngine.FailedRow.builder()
+                                .rowData(rowDataJson)
+                                .errorMessage(e.getMessage())
+                                .build());
                         log.warn("行写入失败: {}", e.getMessage());
                     }
                 }
                 if (batchCount > 0) {
-                    ps.executeBatch();
-                    successRecords += batchCount;
+                    try {
+                        ps.executeBatch();
+                        successRecords += batchCount;
+                    } catch (BatchUpdateException e) {
+                        int[] updateCounts = e.getUpdateCounts();
+                        for (int i = 0; i < updateCounts.length; i++) {
+                            if (updateCounts[i] == Statement.EXECUTE_FAILED) {
+                                failedRecords++;
+                                successRecords--;
+                            }
+                        }
+                        log.warn("批量写入部分失败: {}", e.getMessage());
+                    }
                 }
             }
             conn.commit();
@@ -117,7 +135,9 @@ public class MySQLDataLoader implements DataLoader {
 
         String summary = String.format("数据加载到MySQL [%s.%s] 完成，共 %d 条，成功 %d 条，失败 %d 条，模式: %s",
                 database, table, dataRows.size(), successRecords, failedRecords, writeMode);
-        return FlowEngine.NodeResult.ok(summary, dataRows.size(), successRecords, failedRecords);
+        FlowEngine.NodeResult result = FlowEngine.NodeResult.ok(summary, dataRows.size(), successRecords, failedRecords);
+        result.setFailedRows(failedRows);
+        return result;
     }
 
     private String buildInsertSql(String table, List<String> columns, String writeMode, String onDuplicateKey) {

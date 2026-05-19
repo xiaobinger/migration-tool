@@ -1,6 +1,8 @@
 package com.migration.engine;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.json.JSONObject;
+import cn.hutool.json.JSONUtil;
 import com.migration.model.entity.*;
 import com.migration.model.enums.LogLevel;
 import com.migration.model.enums.NodeType;
@@ -35,6 +37,7 @@ public class FlowEngine {
     private final TaskLogRepository taskLogRepository;
     private final NodeHandlerRegistry nodeHandlerRegistry;
     private final PlatformTransactionManager transactionManager;
+    private final LoadFailureRecordRepository loadFailureRecordRepository;
 
     private final Map<Long, FlowContext> runningTasks = new ConcurrentHashMap<>();
 
@@ -240,6 +243,21 @@ public class FlowEngine {
                 task.setLoadedRecords(task.getLoadedRecords() + result.totalRecords);
                 task.setLoadedSuccessRecords(task.getLoadedSuccessRecords() + result.successRecords);
                 task.setLoadedFailedRecords(task.getLoadedFailedRecords() + result.failedRecords);
+
+                if (result.failedRows != null && !result.failedRows.isEmpty()) {
+                    for (FlowEngine.FailedRow fr : result.failedRows) {
+                        loadFailureRecordRepository.save(LoadFailureRecord.builder()
+                                .taskId(task.getId())
+                                .nodeExecutionId(record.getId())
+                                .nodeId(nodeId)
+                                .nodeName(node.getName())
+                                .targetTable(getConfig(node, "table", getConfig(node, "collection", "")))
+                                .rowData(fr.getRowData())
+                                .errorMessage(fr.getErrorMessage())
+                                .retried(false)
+                                .build());
+                    }
+                }
             }
 
             taskLogRepository.save(TaskLog.builder()
@@ -698,6 +716,11 @@ public class FlowEngine {
         }
     }
 
+    private String getConfig(FlowNode node, String key, String defaultValue) {
+        JSONObject config = JSONUtil.parseObj(node.getConfig() != null ? node.getConfig() : "{}");
+        return config.getStr(key, defaultValue);
+    }
+
     private boolean isDataNode(NodeType nodeType) {
         return nodeType == NodeType.DATA_EXTRACT || nodeType == NodeType.DATA_LOAD;
     }
@@ -740,6 +763,8 @@ public class FlowEngine {
         private long successRecords;
         private long failedRecords;
         private String errorMessage;
+        @Builder.Default
+        private java.util.List<FailedRow> failedRows = new java.util.ArrayList<>();
 
         public static NodeResult ok(String summary, long total, long success, long failed) {
             return NodeResult.builder()
@@ -767,5 +792,14 @@ public class FlowEngine {
                     .errorMessage(errorMessage)
                     .build();
         }
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class FailedRow {
+        private String rowData;
+        private String errorMessage;
     }
 }

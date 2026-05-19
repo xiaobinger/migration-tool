@@ -18,30 +18,30 @@ public class DataSourceConfig {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false,name = "`name`")
     private String name;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private DatabaseType type;
 
-    @Column(nullable = false)
+    @Column(nullable = false,name = "`host`")
     private String host;
 
-    @Column(nullable = false)
+    @Column(nullable = false,name = "`port`")
     @Builder.Default
     private Integer port = 3306;
 
-    @Column(nullable = false)
+    @Column(nullable = false,name = "`database`")
     private String database;
 
     @Column(nullable = false)
     private String username;
 
-    @Column(nullable = false)
+    @Column(nullable = false,name = "`password`")
     private String password;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT",name = "`properties`")
     private String properties;
 
     @Builder.Default
@@ -56,12 +56,14 @@ public class DataSourceConfig {
 
     private String sshPassword;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT",name = "`ssh_auth_key`")
     private String sshAuthKey;
 
     @Builder.Default
+    @Column(name = "`enabled`")
     private Boolean enabled = true;
 
+    @Column(name = "`description`")
     private String description;
 
     @Column(updatable = false)

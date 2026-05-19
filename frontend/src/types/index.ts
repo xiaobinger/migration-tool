@@ -177,6 +177,20 @@ export interface ErrorAnalysis {
   suggestions: string[]
 }
 
+export interface LoadFailureRecord {
+  id: number
+  taskId: number
+  nodeExecutionId: number
+  nodeId: string
+  nodeName: string
+  targetTable: string
+  rowData: string
+  errorMessage: string
+  retried: boolean
+  failedAt: string
+  retriedAt?: string
+}
+
 // 节点类型配置列表
 export const NODE_TYPE_LIST: NodeTypeConfig[] = [
   { code: 'start', label: '开始', icon: 'VideoPlay', color: '#67C23A', category: '控制', description: '流程起始节点' },
