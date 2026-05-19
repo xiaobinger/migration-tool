@@ -6,6 +6,7 @@ import com.migration.service.DataSourceConfigService;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 
+import java.time.*;
 import java.util.*;
 
 @Slf4j
@@ -63,7 +64,7 @@ public class MongoDBDataExtractor implements DataExtractor {
                     Map<String, Object> row = new LinkedHashMap<>();
                     for (Map.Entry<String, Object> entry : doc.entrySet()) {
                         if (!"_id".equals(entry.getKey())) {
-                            row.put(entry.getKey(), entry.getValue());
+                            row.put(entry.getKey(), normalizeValue(entry.getValue()));
                         } else {
                             row.put("_id", entry.getValue().toString());
                         }
@@ -82,5 +83,40 @@ public class MongoDBDataExtractor implements DataExtractor {
 
         String summary = String.format("从MongoDB [%s.%s] 提取数据完成，共 %d 条记录", database, collection, totalRecords);
         return FlowEngine.NodeResult.ok(summary, totalRecords, totalRecords, 0);
+    }
+
+    private static Object normalizeValue(Object value) {
+        if (value == null) return null;
+        if (value instanceof java.util.Date jd) {
+            return jd.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime().toString();
+        }
+        if (value instanceof java.sql.Timestamp ts) {
+            return ts.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime().toString();
+        }
+        if (value instanceof java.sql.Date d) {
+            return d.toLocalDate().toString();
+        }
+        if (value instanceof java.sql.Time t) {
+            return t.toLocalTime().toString();
+        }
+        if (value instanceof LocalDateTime ldt) {
+            return ldt.toString();
+        }
+        if (value instanceof LocalDate ld) {
+            return ld.toString();
+        }
+        if (value instanceof LocalTime lt) {
+            return lt.toString();
+        }
+        if (value instanceof ZonedDateTime zdt) {
+            return zdt.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime().toString();
+        }
+        if (value instanceof Instant instant) {
+            return instant.atZone(ZoneId.systemDefault()).toLocalDateTime().toString();
+        }
+        if (value instanceof OffsetDateTime odt) {
+            return odt.toLocalDateTime().toString();
+        }
+        return value;
     }
 }

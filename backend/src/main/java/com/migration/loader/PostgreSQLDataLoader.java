@@ -7,6 +7,7 @@ import com.migration.service.DataSourceConfigService;
 import lombok.extern.slf4j.Slf4j;
 
 import java.sql.*;
+import java.time.*;
 import java.util.*;
 
 @Slf4j
@@ -79,6 +80,8 @@ public class PostgreSQLDataLoader implements DataLoader {
             Map<String, Object> firstRow = dataRows.get(0);
             List<String> columns = new ArrayList<>(firstRow.keySet());
 
+            Map<String, Integer> columnTypes = getColumnTypes(conn, table, columns);
+
             String sql = buildInsertSql(table, columns, writeMode);
             log.debug("INSERT SQL: {}", sql);
 
@@ -87,7 +90,14 @@ public class PostgreSQLDataLoader implements DataLoader {
                 for (Map<String, Object> row : dataRows) {
                     try {
                         for (int i = 0; i < columns.size(); i++) {
-                            ps.setObject(i + 1, row.get(columns.get(i)));
+                            String col = columns.get(i);
+                            Object val = row.get(col);
+                            Integer sqlType = columnTypes.get(col);
+                            if (sqlType != null) {
+                                ps.setObject(i + 1, convertForTargetColumn(val, sqlType));
+                            } else {
+                                ps.setObject(i + 1, val);
+                            }
                         }
                         ps.addBatch();
                         currentBatch.add(row);
@@ -153,6 +163,46 @@ public class PostgreSQLDataLoader implements DataLoader {
             log.warn("批量写入部分失败: 成功={}, 失败={}, 原因={}", batchSuccess, currentBatch.size() - batchSuccess, e.getMessage());
         }
         return batchSuccess;
+    }
+
+    private Map<String, Integer> getColumnTypes(Connection conn, String table, List<String> columns) {
+        Map<String, Integer> columnTypes = new HashMap<>();
+        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM " + table + " WHERE 1=0")) {
+            try (ResultSet rs = ps.executeQuery()) {
+                ResultSetMetaData meta = rs.getMetaData();
+                for (int i = 1; i <= meta.getColumnCount(); i++) {
+                    columnTypes.put(meta.getColumnLabel(i), meta.getColumnType(i));
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("无法获取目标表列类型信息: {}", e.getMessage());
+        }
+        return columnTypes;
+    }
+
+    private Object convertForTargetColumn(Object value, int targetSqlType) {
+        if (value == null || !(value instanceof String)) return value;
+        String str = (String) value;
+        try {
+            switch (targetSqlType) {
+                case Types.TIMESTAMP:
+                case Types.TIMESTAMP_WITH_TIMEZONE:
+                    if (str.contains("T")) {
+                        return java.sql.Timestamp.valueOf(LocalDateTime.parse(str));
+                    }
+                    return java.sql.Timestamp.valueOf(LocalDateTime.parse(str.replace(" ", "T")));
+                case Types.DATE:
+                    return java.sql.Date.valueOf(LocalDate.parse(str.length() > 10 ? str.substring(0, 10) : str));
+                case Types.TIME:
+                case Types.TIME_WITH_TIMEZONE:
+                    return java.sql.Time.valueOf(LocalTime.parse(str));
+                default:
+                    return value;
+            }
+        } catch (Exception e) {
+            log.warn("日期时间值转换失败: value={}, targetType={}, error={}", str, targetSqlType, e.getMessage());
+            return value;
+        }
     }
 
     private String buildInsertSql(String table, List<String> columns, String writeMode) {

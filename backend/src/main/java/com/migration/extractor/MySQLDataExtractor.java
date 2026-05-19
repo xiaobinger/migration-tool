@@ -6,6 +6,7 @@ import com.migration.service.DataSourceConfigService;
 import lombok.extern.slf4j.Slf4j;
 
 import java.sql.*;
+import java.time.*;
 import java.util.*;
 
 @Slf4j
@@ -86,7 +87,8 @@ public class MySQLDataExtractor implements DataExtractor {
                     while (rs.next()) {
                         Map<String, Object> row = new LinkedHashMap<>();
                         for (int i = 1; i <= colCount; i++) {
-                            row.put(meta.getColumnLabel(i), rs.getObject(i));
+                            Object value = rs.getObject(i);
+                            row.put(meta.getColumnLabel(i), normalizeValue(value, meta.getColumnType(i)));
                         }
                         rows.add(row);
                         totalRecords++;
@@ -103,5 +105,34 @@ public class MySQLDataExtractor implements DataExtractor {
 
         String summary = String.format("从MySQL [%s.%s] 提取数据完成(queryMode=%s)，共 %d 条记录", database, source, queryMode, totalRecords);
         return FlowEngine.NodeResult.ok(summary, totalRecords, totalRecords, 0);
+    }
+
+    private static Object normalizeValue(Object value, int sqlType) {
+        if (value == null) return null;
+        if (value instanceof java.sql.Timestamp ts) {
+            return ts.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime().toString();
+        }
+        if (value instanceof java.sql.Date d) {
+            return d.toLocalDate().toString();
+        }
+        if (value instanceof java.sql.Time t) {
+            return t.toLocalTime().toString();
+        }
+        if (value instanceof LocalDateTime ldt) {
+            return ldt.toString();
+        }
+        if (value instanceof LocalDate ld) {
+            return ld.toString();
+        }
+        if (value instanceof LocalTime lt) {
+            return lt.toString();
+        }
+        if (value instanceof ZonedDateTime zdt) {
+            return zdt.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime().toString();
+        }
+        if (value instanceof Instant instant) {
+            return instant.atZone(ZoneId.systemDefault()).toLocalDateTime().toString();
+        }
+        return value;
     }
 }
