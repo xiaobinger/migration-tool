@@ -109,8 +109,8 @@ public class FlowEngine {
             FlowContext context = new FlowContext();
             context.setTaskId(taskId);
             context.setTask(task);
-            context.setNodeResults(new HashMap<>());
-            context.setVariables(new HashMap<>());
+            context.setNodeResults(new ConcurrentHashMap<>());
+            context.setVariables(new ConcurrentHashMap<>());
             context.setData(new ArrayList<>());
             context.setPaused(false);
             context.setCancelled(false);
@@ -613,27 +613,38 @@ public class FlowEngine {
                                      FlowContext context, MigrationTask task,
                                      Set<String> executedNodes, Set<String> executedEdgeIds,
                                      boolean retryOnFailure, int maxRetryCount) {
-        for (int i = 0; i < chain.size(); i++) {
-            String nodeId = chain.get(i);
-            String incomingEdgeId = null;
-            if (i > 0) {
-                String prevNodeId = chain.get(i - 1);
-                List<FlowEdge> edges = internalOutgoing.get(prevNodeId);
-                if (edges != null) {
-                    incomingEdgeId = edges.stream()
-                            .filter(e -> e.getTargetNodeId().equals(nodeId))
-                            .map(FlowEdge::getEdgeId)
-                            .findFirst()
-                            .orElse(null);
+        String chainId = chain.get(0);
+        String previousChainId = FlowContext.getChainId();
+        FlowContext.setChainId(chainId);
+        try {
+            for (int i = 0; i < chain.size(); i++) {
+                String nodeId = chain.get(i);
+                String incomingEdgeId = null;
+                if (i > 0) {
+                    String prevNodeId = chain.get(i - 1);
+                    List<FlowEdge> edges = internalOutgoing.get(prevNodeId);
+                    if (edges != null) {
+                        incomingEdgeId = edges.stream()
+                                .filter(e -> e.getTargetNodeId().equals(nodeId))
+                                .map(FlowEdge::getEdgeId)
+                                .findFirst()
+                                .orElse(null);
+                    }
+                }
+
+                NodeResult result = executeChildNodeWithRetry(nodeId, incomingEdgeId, nodeMap, outgoingEdges, context, task, executedNodes, executedEdgeIds, retryOnFailure, maxRetryCount);
+                if (!result.isSuccess()) {
+                    return result;
                 }
             }
-
-            NodeResult result = executeChildNodeWithRetry(nodeId, incomingEdgeId, nodeMap, outgoingEdges, context, task, executedNodes, executedEdgeIds, retryOnFailure, maxRetryCount);
-            if (!result.isSuccess()) {
-                return result;
+            return NodeResult.ok("链路执行完成");
+        } finally {
+            if (previousChainId != null) {
+                FlowContext.setChainId(previousChainId);
+            } else {
+                FlowContext.clearChainId();
             }
         }
-        return NodeResult.ok("链路执行完成");
     }
 
     private NodeResult executeChildNodeWithRetry(String nodeId, String incomingEdgeId,
@@ -704,9 +715,7 @@ public class FlowEngine {
                 result = NodeResult.ok("节点执行完成", 0, 0, 0);
             }
 
-            synchronized (context) {
-                context.getNodeResults().put(nodeId, result);
-            }
+            context.getNodeResults().put(nodeId, result);
 
             record.setStatus(TaskStatus.SUCCESS);
             record.setOutputSummary(result.summary);
@@ -748,9 +757,7 @@ public class FlowEngine {
             record.setErrorMessage(e.getMessage());
             record.setFinishedAt(LocalDateTime.now());
             record.setDuration(Duration.between(record.getStartedAt(), record.getFinishedAt()).toMillis());
-            synchronized (context) {
-                context.getNodeResults().put(nodeId, NodeResult.fail(e.getMessage()));
-            }
+            context.getNodeResults().put(nodeId, NodeResult.fail(e.getMessage()));
             return NodeResult.fail(e.getMessage());
         } finally {
             nodeExecutionRepository.save(record);
@@ -785,8 +792,40 @@ public class FlowEngine {
         private Map<String, NodeResult> nodeResults;
         private Map<String, Object> variables;
         private List<Object> data;
-        private boolean paused;
-        private boolean cancelled;
+        private ConcurrentHashMap<String, List<Object>> chainDataMap = new ConcurrentHashMap<>();
+        private volatile boolean paused;
+        private volatile boolean cancelled;
+
+        private static final ThreadLocal<String> currentChainId = new ThreadLocal<>();
+
+        public static void setChainId(String chainId) {
+            currentChainId.set(chainId);
+        }
+
+        public static void clearChainId() {
+            currentChainId.remove();
+        }
+
+        public static String getChainId() {
+            return currentChainId.get();
+        }
+
+        public List<Object> getData() {
+            String chainId = currentChainId.get();
+            if (chainId != null) {
+                return chainDataMap.computeIfAbsent(chainId, k -> new ArrayList<>());
+            }
+            return data;
+        }
+
+        public void setData(List<Object> data) {
+            String chainId = currentChainId.get();
+            if (chainId != null) {
+                chainDataMap.put(chainId, data);
+            } else {
+                this.data = data;
+            }
+        }
 
         public boolean isInterrupted() {
             return paused || cancelled;

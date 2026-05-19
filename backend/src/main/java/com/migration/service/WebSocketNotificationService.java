@@ -61,6 +61,10 @@ public class WebSocketNotificationService {
                 .taskId(task.getId())
                 .taskStatus(task.getStatus().name())
                 .error(error)
+                .extractedRecords(task.getExtractedRecords())
+                .loadedRecords(task.getLoadedRecords())
+                .loadedSuccessRecords(task.getLoadedSuccessRecords())
+                .loadedFailedRecords(task.getLoadedFailedRecords())
                 .timestamp(System.currentTimeMillis())
                 .build();
         webSocket.broadcast(message);
