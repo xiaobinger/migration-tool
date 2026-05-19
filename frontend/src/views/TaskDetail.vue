@@ -191,10 +191,10 @@
 
     <el-dialog v-model="failureDialogVisible" title="加载失败记录" width="80%" top="5vh">
       <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-        <span>共 {{ failureRecords.length }} 条失败记录，其中 {{ failureRecords.filter(r => !r.retried).length }} 条未重试</span>
+        <span>共 {{ failureRecords.length }} 条失败记录，其中 {{ failureRecords.filter(r => !r.retried).length }} 条可重试</span>
         <div>
-          <el-button type="warning" size="small" @click="handleRetryFailures" :loading="retryLoading">
-            标记为待重试
+          <el-button type="warning" size="small" @click="handleRetryFailures" :loading="retryLoading" :disabled="failureRecords.filter(r => !r.retried).length === 0">
+            重试加载
           </el-button>
           <el-button type="danger" size="small" @click="handleClearFailures">
             清除记录
@@ -219,11 +219,11 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column prop="retried" label="重试状态" width="100" align="center">
+        <el-table-column prop="retried" label="重试状态" width="120" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.retried ? 'success' : 'info'" size="small">
-              {{ row.retried ? '已重试' : '未重试' }}
-            </el-tag>
+            <el-tag v-if="!row.retried" type="info" size="small">待重试</el-tag>
+            <el-tag v-else-if="row.retried && !row.errorMessage?.includes('重试仍失败') && !row.errorMessage?.includes('重试异常')" type="success" size="small">重试成功</el-tag>
+            <el-tag v-else type="danger" size="small">重试失败</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="failedAt" label="失败时间" width="170" />
@@ -390,9 +390,13 @@ async function handleRetryFailures() {
   if (!taskStore.currentTask) return
   retryLoading.value = true
   try {
-    const res = await logApi.retryLoadFailures(taskStore.currentTask.id)
-    ElMessage.success(res.message || '已标记为待重试')
+    const res: any = await logApi.retryLoadFailures(taskStore.currentTask.id)
+    ElMessage.success(res.message || '重试完成')
     failureRecords.value = await logApi.loadFailures(taskStore.currentTask.id)
+    if (taskStore.currentTask) {
+      taskStore.currentTask.loadedSuccessRecords = (taskStore.currentTask.loadedSuccessRecords || 0) + (res.successCount || 0)
+      taskStore.currentTask.loadedFailedRecords = Math.max(0, (taskStore.currentTask.loadedFailedRecords || 0) - (res.successCount || 0))
+    }
   } catch (e) { /* ignore */ }
   retryLoading.value = false
 }
