@@ -85,7 +85,6 @@ public class LogController {
 
         long totalSuccess = 0;
         long totalFail = 0;
-        List<LoadFailureRecord> stillFailed = new ArrayList<>();
 
         for (Map.Entry<String, List<LoadFailureRecord>> entry : byNode.entrySet()) {
             String nodeId = entry.getKey();
@@ -99,9 +98,7 @@ public class LogController {
 
             if (node == null || node.getImplementationClass() == null || node.getImplementationClass().isEmpty()) {
                 for (LoadFailureRecord r : nodeFailures) {
-                    r.setRetried(true);
-                    r.setRetriedAt(LocalDateTime.now());
-                    stillFailed.add(r);
+                    r.setErrorMessage("重试失败: 未找到节点配置");
                     totalFail++;
                 }
                 continue;
@@ -110,9 +107,7 @@ public class LogController {
             DataLoader loader = implementationClassRegistry.getLoader(node.getImplementationClass());
             if (loader == null) {
                 for (LoadFailureRecord r : nodeFailures) {
-                    r.setRetried(true);
-                    r.setRetriedAt(LocalDateTime.now());
-                    stillFailed.add(r);
+                    r.setErrorMessage("重试失败: 未找到加载器实现");
                     totalFail++;
                 }
                 continue;
@@ -132,10 +127,7 @@ public class LogController {
                         rowDataList.add(parsed);
                     }
                 } catch (Exception e) {
-                    r.setRetried(true);
-                    r.setRetriedAt(LocalDateTime.now());
                     r.setErrorMessage("重试解析行数据失败: " + e.getMessage());
-                    stillFailed.add(r);
                     totalFail++;
                 }
             }
@@ -153,18 +145,17 @@ public class LogController {
 
                 long nodeRetrySuccess = 0;
                 for (LoadFailureRecord r : nodeFailures) {
-                    r.setRetried(true);
-                    r.setRetriedAt(LocalDateTime.now());
                     if (stillFailedRowData.contains(r.getRowData())) {
                         String newError = result.getFailedRows().stream()
                                 .filter(fr -> fr.getRowData().equals(r.getRowData()))
                                 .map(FlowEngine.FailedRow::getErrorMessage)
                                 .findFirst()
-                                .orElse("重试仍失败");
+                                .orElse("未知错误");
                         r.setErrorMessage("重试仍失败: " + newError);
-                        stillFailed.add(r);
                         totalFail++;
                     } else {
+                        r.setRetried(true);
+                        r.setRetriedAt(LocalDateTime.now());
                         nodeRetrySuccess++;
                         totalSuccess++;
                     }
@@ -180,12 +171,9 @@ public class LogController {
                 }
             } catch (Exception e) {
                 for (LoadFailureRecord r : nodeFailures) {
-                    r.setRetried(true);
-                    r.setRetriedAt(LocalDateTime.now());
                     r.setErrorMessage("重试异常: " + e.getMessage());
-                    stillFailed.add(r);
+                    totalFail++;
                 }
-                totalFail += nodeFailures.size();
             }
         }
 

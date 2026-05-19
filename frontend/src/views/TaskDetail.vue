@@ -221,9 +221,9 @@
         </el-table-column>
         <el-table-column prop="retried" label="重试状态" width="120" align="center">
           <template #default="{ row }">
-            <el-tag v-if="!row.retried" type="info" size="small">待重试</el-tag>
-            <el-tag v-else-if="row.retried && !row.errorMessage?.includes('重试仍失败') && !row.errorMessage?.includes('重试异常')" type="success" size="small">重试成功</el-tag>
-            <el-tag v-else type="danger" size="small">重试失败</el-tag>
+            <el-tag v-if="row.retried" type="success" size="small">重试成功</el-tag>
+            <el-tag v-else-if="row.errorMessage?.includes('重试仍失败') || row.errorMessage?.includes('重试异常')" type="danger" size="small">重试失败</el-tag>
+            <el-tag v-else type="info" size="small">待重试</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="failedAt" label="失败时间" width="170" />
