@@ -1,22 +1,23 @@
 package com.migration.ai;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.migration.engine.ImplementationClassRegistry;
 import com.migration.model.dto.FlowDefinitionDTO;
 import com.migration.model.entity.DataSourceConfig;
 import com.migration.service.DataSourceConfigService;
 import com.migration.service.FlowService;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -99,7 +100,7 @@ public class AiFlowGenerationService {
         List<SkillTemplate> relevantSkills = skillService.findRelevantSkills(userRequirement);
         if (!relevantSkills.isEmpty()) {
             prompt.append("相关的历史成功流程模板（请参考这些模板的节点结构）：\n");
-            for (SkillTemplate skill : relevantSkills.stream().limit(3).collect(Collectors.toList())) {
+            for (SkillTemplate skill : relevantSkills.stream().limit(3).toList()) {
                 prompt.append("- 模板: ").append(skill.getName())
                         .append(", 类别: ").append(skill.getCategory())
                         .append(", 使用次数: ").append(skill.getUsageCount())

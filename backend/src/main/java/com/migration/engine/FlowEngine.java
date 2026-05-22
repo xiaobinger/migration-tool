@@ -163,13 +163,16 @@ public class FlowEngine {
         MigrationTask savedTask = migrationTaskRepository.save(task);
         if (savedTask.getStatus() == TaskStatus.SUCCESS) {
             webSocketNotificationService.notifyTaskComplete(savedTask);
-            try {
-                FlowDefinition flowDef = flowDefinitionRepository.findById(task.getFlowDefinitionId()).orElse(null);
-                String flowName = flowDef != null ? flowDef.getName() : "unknown";
-                skillService.learnFromSuccessfulFlow(task.getFlowDefinitionId(), flowName);
-            } catch (Exception e) {
-                log.warn("自动学习Skill失败: {}", e.getMessage());
-            }
+            final Long flowDefId = task.getFlowDefinitionId();
+            CompletableFuture.runAsync(() -> {
+                try {
+                    FlowDefinition flowDef = flowDefinitionRepository.findById(flowDefId).orElse(null);
+                    String flowName = flowDef != null ? flowDef.getName() : "unknown";
+                    skillService.learnFromSuccessfulFlow(flowDefId, flowName);
+                } catch (Exception e) {
+                    log.warn("自动学习Skill失败: {}", e.getMessage());
+                }
+            });
         } else if (savedTask.getStatus() == TaskStatus.FAILED) {
             webSocketNotificationService.notifyTaskFailed(savedTask, savedTask.getErrorMessage());
         }

@@ -2,12 +2,16 @@ package com.migration.ai;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.migration.model.dto.FlowDefinitionDTO;
+import com.migration.model.entity.FlowEdge;
 import com.migration.model.entity.FlowNode;
 import com.migration.model.enums.NodeType;
+import com.migration.repository.FlowEdgeRepository;
 import com.migration.repository.FlowNodeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -21,18 +25,25 @@ public class SkillService {
     private final SkillTemplateRepository skillTemplateRepository;
     private final UserPreferenceRepository userPreferenceRepository;
     private final FlowNodeRepository flowNodeRepository;
+    private final FlowEdgeRepository flowEdgeRepository;
     private final ObjectMapper objectMapper;
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void learnFromSuccessfulFlow(Long flowDefinitionId, String flowName) {
         try {
             List<FlowNode> nodes = flowNodeRepository.findByFlowDefinitionIdOrderBySortOrder(flowDefinitionId);
-            if (nodes.isEmpty()) return;
+            if (nodes.isEmpty()) {
+                log.warn("学习Skill跳过: 流程无节点, flowId={}", flowDefinitionId);
+                return;
+            }
+
+            List<FlowEdge> edges = flowEdgeRepository.findByFlowDefinitionId(flowDefinitionId);
 
             String sourceType = extractSourceType(nodes);
             String targetType = extractTargetType(nodes);
             String category = determineCategory(nodes);
 
-            FlowDefinitionDTO flowDTO = buildFlowDTO(flowDefinitionId, flowName, nodes);
+            FlowDefinitionDTO flowDTO = buildFlowDTO(flowDefinitionId, flowName, nodes, edges);
             String flowJson = objectMapper.writeValueAsString(flowDTO);
 
             String tags = extractTags(nodes);
@@ -255,7 +266,7 @@ public class SkillService {
         return lastDot >= 0 ? fullClassName.substring(lastDot + 1) : fullClassName;
     }
 
-    private FlowDefinitionDTO buildFlowDTO(Long flowDefinitionId, String flowName, List<FlowNode> nodes) {
+    private FlowDefinitionDTO buildFlowDTO(Long flowDefinitionId, String flowName, List<FlowNode> nodes, List<FlowEdge> edges) {
         FlowDefinitionDTO dto = new FlowDefinitionDTO();
         dto.setName(flowName);
         dto.setNodes(nodes.stream().map(n -> {
@@ -271,7 +282,16 @@ public class SkillService {
             nd.setParentGroupId(n.getParentGroupId());
             return nd;
         }).collect(Collectors.toList()));
-        dto.setEdges(new ArrayList<>());
+        dto.setEdges(edges.stream().map(e -> {
+            FlowDefinitionDTO.EdgeDTO ed = new FlowDefinitionDTO.EdgeDTO();
+            ed.setEdgeId(e.getEdgeId());
+            ed.setSourceNodeId(e.getSourceNodeId());
+            ed.setTargetNodeId(e.getTargetNodeId());
+            ed.setCondition(e.getCondition());
+            ed.setLabel(e.getLabel());
+            ed.setEdgeStyle(e.getEdgeStyle());
+            return ed;
+        }).collect(Collectors.toList()));
         return dto;
     }
 }
