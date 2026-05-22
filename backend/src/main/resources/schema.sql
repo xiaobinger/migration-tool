@@ -27,6 +27,42 @@ CREATE TABLE IF NOT EXISTS `data_source_config` (
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS skill_template;
+CREATE TABLE IF NOT EXISTS `skill_template` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(255) NOT NULL,
+    `description` VARCHAR(1024),
+    `category` VARCHAR(255) NOT NULL,
+    `flow_definition_json` TEXT,
+    `source_type` VARCHAR(255),
+    `target_type` VARCHAR(255),
+    `tags` TEXT,
+    `usage_count` INT NOT NULL DEFAULT 0,
+    `success_rate` DOUBLE NOT NULL DEFAULT 0.0,
+    `source_flow_id` BIGINT,
+    `auto_generated` BIT(1) DEFAULT 1,
+    `created_at` DATETIME,
+    `updated_at` DATETIME,
+    PRIMARY KEY (`id`),
+    KEY `idx_skill_category` (`category`),
+    KEY `idx_skill_source_target` (`source_type`, `target_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS user_preference;
+CREATE TABLE IF NOT EXISTS `user_preference` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `preference_type` VARCHAR(255) NOT NULL,
+    `preference_key` VARCHAR(255) NOT NULL,
+    `preference_value` TEXT,
+    `frequency` INT DEFAULT 1,
+    `last_used_at` DATETIME,
+    `created_at` DATETIME,
+    `updated_at` DATETIME,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_pref_type_key` (`preference_type`, `preference_key`),
+    KEY `idx_pref_type` (`preference_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS flow_definition;
 CREATE TABLE IF NOT EXISTS `flow_definition` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,

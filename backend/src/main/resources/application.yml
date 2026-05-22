@@ -53,3 +53,11 @@ migration:
   dingtalk:
     webhook-url: https://oapi.dingtalk.com/robot/send?access_token=a9ef4c02c54af1312a68686a46bde2e9f1feffa2487d61fd533a66c57075fb61
     secret: SEC639eabb8c2cb160ee8bf08d943f77e435d13ff422f9a33aae1a2662e289ec248
+  ai:
+    enabled: true
+    api-url: http://192.168.10.10:3000/v1/chat/completions
+    api-key: "sk-3KjUIj25xIh88tkw727467259f8f46508b329b5c0cAd5eCf"
+    model: Qwen/Qwen3.6-35B-A3B-FP8
+    max-tokens: 4096
+    temperature: 0.7
+    timeout: 180000

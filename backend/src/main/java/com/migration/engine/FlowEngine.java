@@ -3,6 +3,7 @@ package com.migration.engine;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.migration.ai.SkillService;
 import com.migration.model.entity.*;
 import com.migration.model.enums.LogLevel;
 import com.migration.model.enums.NodeType;
@@ -41,6 +42,7 @@ public class FlowEngine {
     private final PlatformTransactionManager transactionManager;
     private final LoadFailureRecordRepository loadFailureRecordRepository;
     private final WebSocketNotificationService webSocketNotificationService;
+    private final SkillService skillService;
 
     private final Map<Long, FlowContext> runningTasks = new ConcurrentHashMap<>();
 
@@ -161,6 +163,13 @@ public class FlowEngine {
         MigrationTask savedTask = migrationTaskRepository.save(task);
         if (savedTask.getStatus() == TaskStatus.SUCCESS) {
             webSocketNotificationService.notifyTaskComplete(savedTask);
+            try {
+                FlowDefinition flowDef = flowDefinitionRepository.findById(task.getFlowDefinitionId()).orElse(null);
+                String flowName = flowDef != null ? flowDef.getName() : "unknown";
+                skillService.learnFromSuccessfulFlow(task.getFlowDefinitionId(), flowName);
+            } catch (Exception e) {
+                log.warn("自动学习Skill失败: {}", e.getMessage());
+            }
         } else if (savedTask.getStatus() == TaskStatus.FAILED) {
             webSocketNotificationService.notifyTaskFailed(savedTask, savedTask.getErrorMessage());
         }

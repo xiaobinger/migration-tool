@@ -32,6 +32,11 @@ const router = createRouter({
       name: 'DataSourceList',
       component: () => import('../views/DataSourceList.vue'),
     },
+    {
+      path: '/skills',
+      name: 'SkillManager',
+      component: () => import('../views/SkillManager.vue'),
+    },
   ],
 })
 

@@ -27,6 +27,12 @@
           </svg>
           <span>{{ showHelp ? '隐藏' : '显示' }}帮助</span>
         </button>
+        <button class="tool-btn ai-btn" @click="showAiAssistant = !showAiAssistant" :class="{ active: showAiAssistant }">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>AI 助手</span>
+        </button>
       </div>
 
       <div class="toolbar-right">
@@ -438,6 +444,14 @@
       </transition>
 
       <FlowHelpTip v-if="showHelp" @close="showHelp = false" />
+
+      <transition name="slide-ai">
+        <AiAssistant
+          v-if="showAiAssistant"
+          @close="showAiAssistant = false"
+          @apply-flow="handleApplyAiFlow"
+        />
+      </transition>
     </div>
   </div>
   <div class="flow-designer loading-state" v-else>
@@ -465,6 +479,7 @@ import NodePanel from '../components/NodePanel.vue'
 import FlowCanvas from '../components/FlowCanvas.vue'
 import CanvasToolbar from '../components/CanvasToolbar.vue'
 import FlowHelpTip from '../components/FlowHelpTip.vue'
+import AiAssistant from '../components/AiAssistant.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -483,6 +498,7 @@ const tableList = ref<string[]>([])
 const tableLoading = ref(false)
 const flowCanvasRef = ref<InstanceType<typeof FlowCanvas> | null>(null)
 const executing = ref(false)
+const showAiAssistant = ref(false)
 const multiSelectedNodeIds = ref<string[]>([])
 
 const selectedParallelGroupNodes = computed(() => {
@@ -913,6 +929,51 @@ async function handleSave() {
   } catch (e) {
     ElMessage.error('保存失败')
   }
+}
+
+function handleApplyAiFlow(flowData: any) {
+  if (!flowStore.currentFlow) return
+
+  if (flowData.nodes && Array.isArray(flowData.nodes)) {
+    const existingNodeIds = new Set(flowStore.currentFlow.nodes.map(n => n.nodeId))
+    const maxOffset = flowStore.currentFlow.nodes.length * 50
+
+    for (const node of flowData.nodes) {
+      let nodeId = node.nodeId
+      let counter = 1
+      while (existingNodeIds.has(nodeId)) {
+        nodeId = `${node.nodeId}_${counter++}`
+      }
+      existingNodeIds.add(nodeId)
+
+      flowStore.currentFlow.nodes.push({
+        nodeId,
+        nodeType: node.nodeType,
+        name: node.name || node.nodeType,
+        description: node.description,
+        config: typeof node.config === 'string' ? node.config : JSON.stringify(node.config || {}),
+        positionX: (node.positionX || 100) + maxOffset,
+        positionY: node.positionY || 200,
+        implementationClass: node.implementationClass || '',
+        parentGroupId: node.parentGroupId,
+      })
+    }
+  }
+
+  if (flowData.edges && Array.isArray(flowData.edges)) {
+    for (const edge of flowData.edges) {
+      flowStore.currentFlow.edges.push({
+        edgeId: edge.edgeId || `edge_ai_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+        sourceNodeId: edge.sourceNodeId,
+        targetNodeId: edge.targetNodeId,
+        condition: edge.condition,
+        label: edge.label,
+        edgeStyle: edge.edgeStyle || 'straight',
+      })
+    }
+  }
+
+  showAiAssistant.value = false
 }
 
 async function handleExecute() {
@@ -1668,6 +1729,27 @@ async function handleExecute() {
 
 .slide-panel-enter-from,
 .slide-panel-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+
+.ai-btn {
+  background: linear-gradient(135deg, #667eea, #764ba2) !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+.ai-btn:hover {
+  opacity: 0.9;
+}
+
+.slide-ai-enter-active,
+.slide-ai-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-ai-enter-from,
+.slide-ai-leave-to {
   opacity: 0;
   transform: translateX(20px);
 }

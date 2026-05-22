@@ -49,6 +49,12 @@
               </svg>
               <span>数据源</span>
             </el-menu-item>
+            <el-menu-item index="/skills" class="nav-item">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="nav-icon">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              <span>Skills</span>
+            </el-menu-item>
           </el-menu>
         </div>
       </el-header>
@@ -73,6 +79,7 @@ const currentRoute = computed(() => {
   if (route.path.startsWith('/flows')) return '/flows'
   if (route.path.startsWith('/tasks')) return '/tasks'
   if (route.path.startsWith('/datasources')) return '/datasources'
+  if (route.path.startsWith('/skills')) return '/skills'
   return '/'
 })
 </script>
