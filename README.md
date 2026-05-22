@@ -1,6 +1,6 @@
 # Migration Tool - 可视化流程配置数据迁移工具
 
-一个基于 Spring Boot + Vue 3 的可视化数据迁移平台，通过拖拽式流程设计器编排数据提取、转换、加载（ETL）流程，支持多种数据源、条件分支、并行执行、断点续传等企业级特性。
+一个基于 Spring Boot + Vue 3 的可视化数据迁移平台，通过拖拽式流程设计器编排数据提取、转换、加载（ETL）流程，支持多种数据源、条件分支、并行执行、断点续传、AI 智能生成流程等企业级特性。
 
 ## 目录
 
@@ -20,6 +20,7 @@
   - [画布交互](#画布交互)
   - [组件清单](#组件清单)
 - [配置说明](#配置说明)
+- [AI 智能功能](#ai-智能功能)
 - [数据库初始化](#数据库初始化)
 
 ---
@@ -72,6 +73,17 @@ migration-tool/
 │       │   │   ├── FlowController.java
 │       │   │   ├── LogController.java
 │       │   │   └── TaskController.java
+│       │   ├── ai/                   # AI 智能模块
+│       │   │   ├── AiConfig.java          # AI 配置
+│       │   │   ├── AiService.java         # AI 大模型调用服务
+│       │   │   ├── AiMessage.java         # 对话消息模型
+│       │   │   ├── AiController.java      # AI API 端点
+│       │   │   ├── AiFlowGenerationService.java  # AI 流程生成服务
+│       │   │   ├── SkillService.java      # Skills 学习与推荐服务
+│       │   │   ├── SkillTemplate.java     # Skill 模板实体
+│       │   │   ├── UserPreference.java    # 用户偏好实体
+│       │   │   ├── SkillTemplateRepository.java
+│       │   │   └── UserPreferenceRepository.java
 │       │   ├── engine/               # 流程引擎核心
 │       │   │   ├── FlowEngine.java
 │       │   │   ├── ImplementationClassRegistry.java
@@ -136,6 +148,7 @@ migration-tool/
 │       │   │   ├── FlowDefinitionRepository.java
 │       │   │   ├── FlowEdgeRepository.java
 │       │   │   ├── FlowNodeRepository.java
+│       │   │   ├── LoadFailureRecordRepository.java
 │       │   │   ├── MigrationTaskRepository.java
 │       │   │   ├── NodeExecutionRepository.java
 │       │   │   └── TaskLogRepository.java
@@ -168,11 +181,13 @@ migration-tool/
         │   ├── flow.ts               # 流程定义 API
         │   ├── task.ts               # 任务 API
         │   ├── datasource.ts         # 数据源 API
-        │   └── log.ts                # 日志 API
+        │   ├── log.ts                # 日志 API
+        │   └── ai.ts                 # AI 智能功能 API
         ├── components/               # 公共组件
         │   ├── FlowCanvas.vue        # SVG 流程画布（核心）
         │   ├── CanvasToolbar.vue     # 画布工具栏
         │   ├── NodePanel.vue         # 节点面板
+        │   ├── AiAssistant.vue       # AI 助手面板
         │   ├── LogPanel.vue          # 日志面板
         │   ├── ErrorAnalysis.vue     # 错误分析
         │   ├── ConditionHelp.vue     # 条件帮助
@@ -193,7 +208,8 @@ migration-tool/
             ├── FlowDesigner.vue      # 流程设计器
             ├── TaskMonitor.vue       # 任务监控
             ├── TaskDetail.vue        # 任务详情
-            └── DataSourceList.vue    # 数据源管理
+            ├── DataSourceList.vue    # 数据源管理
+            └── SkillManager.vue     # Skills 模板管理
 ```
 
 ---
@@ -275,6 +291,16 @@ npm run dev
 - **邮件通知**：SMTP 邮件发送
 - **Webhook**：自定义 HTTP 回调
 
+### AI 智能功能
+
+- **AI 对话助手**：在流程设计器中内置 AI 助手面板，自然语言描述需求即可获得建议
+- **智能流程生成**：描述数据迁移需求，AI 自动生成完整的流程定义（节点+连线），一键应用到画布
+- **需求分析**：AI 分析迁移需求，给出数据源选择、清洗策略、质量保障等专业建议
+- **Skills 自动学习**：每次流程成功执行后自动提取模式，生成可复用的 Skill 模板
+- **操作习惯学习**：自动记录常用数据源、表映射关系等偏好，AI 生成流程时优先参考
+- **Skills 模板管理**：独立的 Skills 管理页面，支持查看/应用/编辑/删除模板
+- **自定义模型**：支持通过 HTTP 调用任意兼容 OpenAI Chat Completions 格式的大模型（DeepSeek、Qwen、Ollama 等）
+
 ---
 
 ## 后端架构
@@ -285,11 +311,18 @@ npm run dev
 ┌─────────────────────────────────────────────────────────────┐
 │                      Controller 层                           │
 │  FlowController / TaskController / DataSourceController /    │
-│  LogController                                              │
+│  LogController / AiController                               │
 ├─────────────────────────────────────────────────────────────┤
 │                      Service 层                              │
 │  FlowService / TaskService / DataSourceConfigService /       │
 │  LogService / WebSocketNotificationService                  │
+├─────────────────────────────────────────────────────────────┤
+│                      AI 智能层                                │
+│  AiService ──→ AiFlowGenerationService ──→ SkillService     │
+│       │                │                    │                │
+│       │                ├── 流程生成           ├── Skill 模板  │
+│       │                └── 需求分析           └── 用户偏好    │
+│       └── AiConfig (自定义模型HTTP调用)                       │
 ├─────────────────────────────────────────────────────────────┤
 │                      Engine 层                               │
 │  FlowEngine ──→ NodeHandlerRegistry ──→ NodeExecutor        │
@@ -504,6 +537,38 @@ DataSourceConfig (独立)
 | created_at | DATETIME | 创建时间 |
 | updated_at | DATETIME | 更新时间 |
 
+**skill_template** - AI Skill 模板
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| name | VARCHAR(255) | 模板名称 |
+| description | VARCHAR(1024) | 描述 |
+| category | VARCHAR(255) | 分类（simple_migration/transform_migration/parallel_migration等） |
+| flow_definition_json | TEXT | 流程定义JSON |
+| source_type | VARCHAR(255) | 源数据类型 |
+| target_type | VARCHAR(255) | 目标数据类型 |
+| tags | TEXT | 标签（逗号分隔） |
+| usage_count | INT | 使用次数 |
+| success_rate | DOUBLE | 成功率 |
+| source_flow_id | BIGINT | 来源流程ID |
+| auto_generated | BIT | 是否自动学习生成 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
+**user_preference** - 用户偏好
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | BIGINT PK | 主键 |
+| preference_type | VARCHAR(255) | 偏好类型（datasource/implementation/table等） |
+| preference_key | VARCHAR(255) | 偏好键 |
+| preference_value | TEXT | 偏好值 |
+| frequency | INT | 使用频率 |
+| last_used_at | DATETIME | 最后使用时间 |
+| created_at | DATETIME | 创建时间 |
+| updated_at | DATETIME | 更新时间 |
+
 ### REST API
 
 #### 流程管理 `/api/flows`
@@ -557,6 +622,22 @@ DataSourceConfig (独立)
 | GET | `/logs/task/{taskId}/executions` | 获取节点执行记录 |
 | GET | `/logs/task/{taskId}/error-analysis` | 获取错误分析 |
 
+#### AI 智能功能 `/api/ai`
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/ai/chat` | AI 对话（支持历史消息上下文） |
+| POST | `/ai/generate-flow` | AI 生成流程定义（可选 autoSave 直接保存） |
+| POST | `/ai/analyze` | AI 需求分析 |
+| GET | `/ai/skills` | 获取 Skill 模板列表（可选 category 筛选） |
+| POST | `/ai/skills` | 创建 Skill 模板 |
+| PUT | `/ai/skills/{id}` | 更新 Skill 模板 |
+| DELETE | `/ai/skills/{id}` | 删除 Skill 模板 |
+| POST | `/ai/skills/{id}/use` | 增加 Skill 使用次数 |
+| GET | `/ai/preferences` | 获取用户偏好列表（可选 type 筛选） |
+| POST | `/ai/learn/{flowDefinitionId}` | 从成功流程学习生成 Skill |
+| GET | `/ai/config` | 获取 AI 配置状态 |
+
 #### WebSocket `/ws/task-progress`
 
 消息类型：
@@ -581,10 +662,11 @@ DataSourceConfig (独立)
 |------|------|------|
 | `/` | - | 重定向到 `/flows` |
 | `/flows` | FlowList | 流程列表，支持新建/编辑/删除/立即执行 |
-| `/flows/designer/:id?` | FlowDesigner | 流程设计器，可视化拖拽设计流程 |
+| `/flows/designer/:id?` | FlowDesigner | 流程设计器，可视化拖拽设计流程，内置 AI 助手 |
 | `/tasks` | TaskMonitor | 任务监控列表，查看所有任务状态 |
 | `/tasks/:id` | TaskDetail | 任务详情，实时查看执行进度和日志 |
 | `/datasources` | DataSourceList | 数据源管理，CRUD + 连接测试 |
+| `/skills` | SkillManager | Skills 模板管理，查看/应用/编辑/删除 |
 
 ### 状态管理
 
@@ -637,6 +719,7 @@ FlowCanvas 是核心 SVG 画布组件，支持以下交互：
 | FlowCanvas.vue | SVG 流程画布，节点渲染/连线/框选/拖拽/缩放/平移 |
 | CanvasToolbar.vue | 画布工具栏，缩放/适应/重置/连线样式/动画开关 |
 | NodePanel.vue | 左侧节点面板，拖拽添加节点 |
+| AiAssistant.vue | AI 助手面板，对话/生成流程/需求分析/Skills管理 |
 | LogPanel.vue | 日志面板，展示任务执行日志 |
 | ErrorAnalysis.vue | 错误分析面板，统计错误类型和建议 |
 | ConditionHelp.vue | 条件表达式帮助 |
@@ -674,6 +757,14 @@ migration:
   dingtalk:
     webhook-url: <webhook_url>   # 钉钉机器人 Webhook
     secret: <secret>             # 钉钉加签密钥
+  ai:
+    enabled: false               # 是否启用 AI 功能
+    api-url: http://localhost:11434/v1/chat/completions  # AI 模型 API 地址（兼容 OpenAI 格式）
+    api-key: ""                  # API 密钥（可选）
+    model: deepseek-chat         # 模型名称
+    max-tokens: 4096             # 最大生成 token 数
+    temperature: 0.7             # 生成温度（0-1）
+    timeout: 180000              # 请求超时(ms)
 ```
 
 ### 前端配置 `vite.config.ts`
@@ -696,13 +787,98 @@ server: {
 
 ---
 
+## AI 智能功能
+
+### 架构概览
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        前端                                      │
+│  FlowDesigner.vue ──→ AiAssistant.vue ──→ ai.ts API             │
+│  SkillManager.vue ──→ ai.ts API                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                        后端                                      │
+│  AiController                                                   │
+│    ├── AiService ──→ HTTP 调用大模型 API                          │
+│    ├── AiFlowGenerationService ──→ 构建 Prompt + 解析响应         │
+│    │       ├── 注入数据源信息、实现类列表                           │
+│    │       ├── 注入相关 Skill 模板和用户偏好                        │
+│    │       └── 解析 AI 返回的 JSON 流程定义                        │
+│    └── SkillService                                             │
+│            ├── learnFromSuccessfulFlow() ──→ 自动学习             │
+│            ├── findRelevantSkills() ──→ 智能推荐                  │
+│            └── recordPreference() ──→ 习惯记录                    │
+├─────────────────────────────────────────────────────────────────┤
+│  FlowEngine ──→ 任务成功时自动调用 SkillService.learnFromSuccessfulFlow()  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### AI 对话
+
+通过 `/api/ai/chat` 端点与 AI 模型对话，支持传入历史消息实现多轮对话。系统会自动注入数据迁移领域的系统提示词，让 AI 扮演专业的数据迁移助手角色。
+
+### 智能流程生成
+
+1. 用户在 AI 助手中描述需求（如"将MySQL的users表数据清洗后迁移到PostgreSQL"）
+2. 系统构建包含以下信息的 Prompt：
+   - 可用数据源列表（ID、名称、类型、连接信息）
+   - 可用实现类列表（提取器、加载器、转换器等）
+   - 相关的 Skill 模板（基于需求关键词匹配）
+   - 用户偏好（常用数据源、表映射等）
+3. AI 返回 JSON 格式的流程定义（nodes + edges）
+4. 前端解析后可一键应用到画布或保存为新流程
+
+### Skills 自动学习
+
+**触发时机**：每次流程任务成功完成时，FlowEngine 自动调用 `SkillService.learnFromSuccessfulFlow()`
+
+**学习内容**：
+- 流程结构模式（节点类型组合、连线关系）
+- 数据源使用模式（源→目标类型）
+- 节点实现类选择偏好
+- 表和字段映射关系
+
+**Skill 分类**：
+| 分类 | 说明 |
+|------|------|
+| `simple_migration` | 简单提取→加载 |
+| `transform_migration` | 包含数据转换 |
+| `quality_aware_migration` | 包含数据校验 |
+| `parallel_migration` | 并行执行 |
+| `custom` | 自定义 |
+
+### 用户偏好学习
+
+系统自动记录用户的操作习惯，在 AI 生成流程时作为参考：
+
+| 偏好类型 | 记录内容 | 用途 |
+|----------|----------|------|
+| `datasource` | 常用数据源 ID | AI 生成时优先选择 |
+| `implementation` | 节点类型→实现类映射 | AI 生成时使用偏好实现类 |
+| `table` | 常用表名 | AI 生成时优先填入 |
+| `flow_generation` | 流程需求描述 | 优化 Prompt 构建 |
+
+### 支持的 AI 模型
+
+任何兼容 OpenAI Chat Completions API 格式的模型服务均可接入：
+
+| 模型服务 | API 地址示例 | 说明 |
+|----------|-------------|------|
+| Ollama | `http://localhost:11434/v1/chat/completions` | 本地部署 |
+| DeepSeek | `https://api.deepseek.com/v1/chat/completions` | 云端 API |
+| 阿里通义千问 | 通过阿里云百炼平台 | 云端 API |
+| OpenAI | `https://api.openai.com/v1/chat/completions` | 需海外网络 |
+| 自部署模型 | 自定义 HTTP 地址 | 需兼容 OpenAI 格式 |
+
+---
+
 ## 数据库初始化
 
 项目提供了 `schema.sql` 作为参考，但实际运行时使用 Hibernate `ddl-auto: update` 自动管理表结构。
 
 如需手动初始化，可执行 `backend/src/main/resources/schema.sql`，该脚本包含：
 - 创建数据库 `migration_tool`
-- 7 张表的完整建表语句（`IF NOT EXISTS` 安全模式）
+- 10 张表的完整建表语句（`IF NOT EXISTS` 安全模式）
 - 所有表使用 `utf8mb4_unicode_ci` 字符集
 
 **枚举值参考**：
